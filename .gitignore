@@ -5,3 +5,5 @@ node_modules
 *.log
 .vercel
 next-env.d.ts
+call-check-report.md
+verify-report.txt

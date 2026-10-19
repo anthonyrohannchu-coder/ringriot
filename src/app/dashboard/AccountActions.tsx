@@ -80,9 +80,26 @@ export function DeleteAccount() {
       onClick={async () => {
         if (prompt('Type DELETE to permanently delete your account') !== "DELETE") return;
         setBusy(true);
-        const r = await fetch("/api/account", { method: "DELETE" });
+        const del = (confirmForfeit: boolean) =>
+          fetch("/api/account", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmForfeit }) });
+        let r = await del(false);
+        let d = await r.json().catch(() => ({}));
+        if (r.status === 409 && d.error === "active_subscription") {
+          // A paid period is still running: say so before giving it up.
+          const until = d.paidThrough ? new Date(d.paidThrough).toLocaleDateString() : "the end of your billing period";
+          const ok = confirm(
+            `Your plan is paid through ${until}. To keep using it, cancel from "Manage billing" instead and delete your account after that date.\n\n` +
+              `Delete now anyway? You'll lose the remaining days (they aren't refunded automatically) and you won't be charged again.`,
+          );
+          if (!ok) { setBusy(false); return; }
+          r = await del(true);
+          d = await r.json().catch(() => ({}));
+        }
         if (r.ok) { await supabaseBrowser().auth.signOut(); window.location.href = "/"; }
-        else { alert("Couldn't delete the account. Email support."); setBusy(false); }
+        else {
+          alert(d.message ?? "Couldn't delete the account. Email support.");
+          setBusy(false);
+        }
       }}
       className="mt-3 rounded-full border border-nope px-5 py-2.5 text-sm font-semibold text-nope disabled:opacity-60"
     >

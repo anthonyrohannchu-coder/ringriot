@@ -2,6 +2,7 @@
 // (and give it a look in CharacterFace.tsx). Everything else reads from here.
 // All characters are ORIGINAL fictional people. No real people, no existing IP,
 // no ethnic or racial stereotypes, no sexual characters.
+import { characterStyles, scenarioAdditions } from "./scenarios";
 
 export type VoiceConfig = {
   browser: { pitch: number; rate: number; prefer?: "male" | "female" };
@@ -11,7 +12,22 @@ export type VoiceConfig = {
   elevenlabsVoiceId?: string;
 };
 
-export type Scenario = { id: string; title: string; setup: string; opener: string };
+export type Scenario = {
+  id: string;
+  title: string;
+  /** The situation the AI plays out. */
+  setup: string;
+  /** First line the character says when the call connects. */
+  opener: string;
+  /** Who the character is in THIS call. When set, it replaces the character's default backstory in the prompt. */
+  persona?: string;
+  /** Escalation ideas the AI can use, one at a time, when they fit what the recipient says. */
+  beats?: string[];
+  /** How to land the bit when the call wraps up. */
+  ending?: string;
+  /** Lines used only when no AI provider is configured. */
+  fallbackLines?: string[];
+};
 
 export type Character = {
   id: string;
@@ -21,6 +37,8 @@ export type Character = {
   tier: "free" | "plus" | "pro";
   description: string;
   personality: string;
+  /** Short temperament line used together with a scenario persona. */
+  style?: string;
   voice: VoiceConfig;
   exampleLine: string;
   scenarios: Scenario[];
@@ -52,6 +70,12 @@ export const characters: Character[] = [
         title: "Needs help with his cellmate drama",
         setup: "Your cellmate Pretzel ate your pudding cup and you need the person to help you decide how to confront him like an adult.",
         opener: "Okay so don't freak out, I'm fine, I'm in jail, but that's not the problem. The problem is Pretzel ate my pudding.",
+      },
+      {
+        id: "borrowed-chair",
+        title: "Needs his lawn chair back",
+        setup: "You are a clearly fictional, overdramatic guy who accidentally took a neighbor’s lawn chair and now wants to return it with an unnecessarily emotional apology. Never threaten anyone or claim to be a real official.",
+        opener: "Okay, so quick question. If a lawn chair has been in my garage for three weeks, is it still borrowing or have I adopted it?",
       },
     ],
     fallbackLines: [
@@ -95,6 +119,12 @@ export const characters: Character[] = [
         setup: "You tried to hide in a kids' play area during your heist and you're now stuck in the ball pit. You need emotional support.",
         opener: "Okay okay okay. Don't laugh. I'm in the ball pit. I'm stuck in the ball pit. The alarm is going off.",
       },
+      {
+        id: "wrong-order",
+        title: "Ordered 400 tiny spoons",
+        setup: "You are an absurd fictional customer who somehow received four hundred tiny spoons instead of one normal spoon. Treat the mix-up as a silly mystery, not a real business complaint.",
+        opener: "Hey, real quick, did you order four hundred tiny spoons? Because I have a drawer full of them and I’m starting to think they’re multiplying.",
+      },
     ],
     fallbackLines: [
       "You're not Marcus? ...Can you BE Marcus? Just for like ten minutes?",
@@ -130,6 +160,18 @@ export const characters: Character[] = [
         title: "Missing one ketchup packet",
         setup: "You think you're calling the fast food place that forgot one of your ketchup packets. You demand justice.",
         opener: "Hi. Yes. Is this the manager? No? Then get me the manager. Actually get me YOUR manager's manager.",
+      },
+      {
+        id: "fry-audit",
+        title: "One fry is missing",
+        setup: "You are an overdramatic fictional customer convinced one single fry has gone missing. Keep the complaint silly and do not claim to represent a real restaurant or employee.",
+        opener: "Hi. I have a very serious fry situation. The box says large, but emotionally, it feels like medium.",
+      },
+      {
+        id: "mystery-sauce",
+        title: "Demanding answers about mystery sauce",
+        setup: "You are a fictional customer who found an unlabeled sauce packet and wants to know if it is ketchup, barbecue, or “something with a backstory.” Keep it playful.",
+        opener: "I need you to be honest with me. This sauce packet has no label. What are we dealing with here?",
       },
     ],
     fallbackLines: [
@@ -167,6 +209,12 @@ export const characters: Character[] = [
         setup: "You 'accidentally' called your ex at 2 a.m. You claim you're over them but keep bringing up small things, especially your gray hoodie.",
         opener: "Oh! Hey. Did I call you? Ha. Total pocket dial. Anyway... how are you. Not that I care. How are you though.",
       },
+      {
+        id: "secret-crush",
+        title: "Practiced a confession on the wrong person",
+        setup: "You are an awkward fictional character who meant to rehearse a harmless secret-crush confession with a friend, but called the wrong person. If the recipient sounds uncomfortable, apologize and end the bit.",
+        opener: "Okay, don’t hang up. I have practiced this speech seventeen times and I think I may have called the wrong person. This is already going amazing.",
+      },
     ],
     fallbackLines: [
       "I'm literally SO over it. I'm doing yoga now. ...Do you still have my hoodie?",
@@ -202,6 +250,12 @@ export const characters: Character[] = [
         title: "Can't find your house (you didn't order)",
         setup: "You're delivering a pizza the person never ordered. You've been lost for three hours and refuse to accept you have the wrong address.",
         opener: "Hey, Sal from the pizza place. I'm outside. I think. Can you turn your porch light on? Wave? Do a little dance?",
+      },
+      {
+        id: "blocked-car",
+        title: "A tiny car is blocking the driveway",
+        setup: "You are a fictional delivery driver who has found a toy-sized car blocking an imaginary driveway and is treating it like a traffic emergency. Do not claim to be from a real delivery company.",
+        opener: "Hey, I’m outside and there’s a tiny car blocking the driveway. Like, toy-sized. I respect the driver, but I need answers.",
       },
     ],
     fallbackLines: [
@@ -239,6 +293,12 @@ export const characters: Character[] = [
         setup: "You're convinced the pigeons in the neighborhood are surveillance drones and you're warning the person.",
         opener: "Is this line secure? Don't answer that, they'll hear. Okay. Look out your window. Is there a pigeon?",
       },
+      {
+        id: "dog-review",
+        title: "Your dog left a one-star review",
+        setup: "You are a fictional neighbor who insists the recipient’s dog has left a one-star review of your garden by dramatically sniffing every plant. It is an obviously silly misunderstanding.",
+        opener: "I need to talk to you about your dog. He came into my yard, inspected my tomatoes, and left without saying a word. Very rude review process.",
+      },
     ],
     fallbackLines: [
       "Exactly. EXACTLY. That's what they WANT you to say.",
@@ -274,6 +334,12 @@ export const characters: Character[] = [
         title: "Needs you to confirm his gains",
         setup: "You need the person to confirm you look bigger than last week, even though they can't see you.",
         opener: "Bro! Quick question, bro. Do I sound bigger? Like, my voice. Does it sound like it has more muscle?",
+      },
+      {
+        id: "protein-delivery",
+        title: "A protein shake has been delivered to the wrong gym",
+        setup: "You are a fictional gym enthusiast who is trying to return an absurdly large imaginary protein shake to its rightful owner. No real business claims.",
+        opener: "Bro, I have a gallon-sized protein shake here and it has your name on it. Well, not your name. It says “strong person.” Could be you.",
       },
     ],
     fallbackLines: [
@@ -311,6 +377,12 @@ export const characters: Character[] = [
         setup: "You're sure the person is your old army buddy Lefty. You want to reminisce about stories that never quite finish.",
         opener: "Hello? Lefty? Is that you? Oh, I'd know that breathing anywhere. It's Earl! From the jeep!",
       },
+      {
+        id: "yard-mystery",
+        title: "A mystery lawn ornament appeared",
+        setup: "You are a sweet, rambling fictional older man who found a ridiculous lawn ornament in his yard and wants help solving the mystery. Do not mock age or claim real-world authority.",
+        opener: "Hello there. A ceramic goose has appeared in my yard wearing a tiny hat. I don’t remember ordering a goose, and frankly, the hat is suspicious.",
+      },
     ],
     fallbackLines: [
       "So there we were, 1958, in the jeep... where was I? Oh, Mr. Buttons is on the counter again.",
@@ -331,8 +403,23 @@ export const characters: Character[] = [
   },
 ];
 
+// Attach temperament lines and the prank-call scenarios from scenarios.ts.
+for (const c of characters) {
+  c.style ??= characterStyles[c.id];
+  for (const add of scenarioAdditions[c.id] ?? []) {
+    const i = c.scenarios.findIndex((s) => s.id === add.id);
+    if (i >= 0) c.scenarios[i] = add;
+    else c.scenarios.push(add);
+  }
+}
+
 export function getCharacter(id: string) {
   return characters.find((c) => c.id === id);
+}
+
+/** Exact match only (used where an unknown id must be rejected, e.g. real calls). */
+export function findScenario(character: Character, scenarioId: string) {
+  return character.scenarios.find((s) => s.id === scenarioId) ?? null;
 }
 
 export function getScenario(character: Character, scenarioId: string) {
@@ -341,7 +428,10 @@ export function getScenario(character: Character, scenarioId: string) {
 
 /** Public-safe view: strips prompts and line banks before sending to the browser. */
 export function publicCharacter(c: Character) {
-  const { personality: _p, fallbackLines: _f, spicyLines: _s2, ...rest } = c;
-  return { ...rest, scenarios: c.scenarios.map(({ setup: _s, ...s }) => s) };
+  const { personality: _p, style: _st, fallbackLines: _f, spicyLines: _s2, ...rest } = c;
+  return {
+    ...rest,
+    scenarios: c.scenarios.map(({ id, title, opener }) => ({ id, title, opener })),
+  };
 }
 export type PublicCharacter = ReturnType<typeof publicCharacter>;

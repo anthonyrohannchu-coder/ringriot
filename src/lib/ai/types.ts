@@ -8,6 +8,14 @@ export type GenerateInput = {
   history: ChatTurn[];
   userName?: string;
   spicy?: boolean; // 18+ opt-in: swearing and roasts allowed
+  /** "phone" = live Twilio call: speech-to-text input, spoken output, can end the call. */
+  channel?: "browser" | "phone";
+  /** Phone calls: first name of the friend who sent the call (already announced in the disclosure). */
+  senderName?: string;
+  /** Phone calls: how many character replies remain, including this one. 1 = this is the last line. */
+  repliesLeft?: number;
+  /** Phone calls: what to do with the recipient's LATEST line (built per turn by callFlow). Put last in the prompt. */
+  turnNote?: string;
 };
 
 export type GenerateResult = {
