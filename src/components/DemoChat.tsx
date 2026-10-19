@@ -10,18 +10,22 @@ type Turn = { role: "user" | "character"; text: string };
 type Mode = "demo" | "paid";
 
 const DECLINE_LINES = [
-  "Declined?! Oh, she's calling back.",
-  "You declined AGAIN. She has your number memorized now.",
+  "Declined?! Oh no. They're calling back.",
+  "You declined AGAIN. They have your number memorized now.",
   "Third time. Honestly? Just pick up.",
 ];
 
 function pickVoice(prefer?: "male" | "female") {
   const voices = typeof window !== "undefined" ? window.speechSynthesis?.getVoices() ?? [] : [];
-  const en = voices.filter((v) => v.lang.startsWith("en"));
-  const femaleHints = /female|samantha|victoria|karen|moira|tessa|zira|aria|jenny|google us english/i;
-  const maleHints = /male|daniel|alex|fred|david|guy|ryan|google uk english male/i;
-  const hint = prefer === "female" ? femaleHints : prefer === "male" ? maleHints : null;
-  return (hint && en.find((v) => hint.test(v.name))) || en[0] || voices[0];
+  const en = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
+  const female = /female|samantha|victoria|karen|moira|tessa|zira|aria|jenny|emma|ava|allison|susan|serena|libby|sonia|michelle|google us english|google uk english female/i;
+  const male = /\bmale|daniel|alex|fred|david|guy|ryan|tom|aaron|arthur|evan|nathan|christopher|eric|google uk english male/i;
+  // Prefer the most natural-sounding voices the device has (neural/premium/enhanced/online), then Google voices.
+  const quality = (v: SpeechSynthesisVoice) =>
+    (/natural|neural|premium|enhanced|online/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
+  const gender = (v: SpeechSynthesisVoice) => (prefer === "female" ? female.test(v.name) && !/\bmale/i.test(v.name) : prefer === "male" ? male.test(v.name) : true);
+  const ranked = [...en].sort((a, b) => Number(gender(b)) * 10 + quality(b) - (Number(gender(a)) * 10 + quality(a)));
+  return ranked[0] || voices[0];
 }
 
 const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;

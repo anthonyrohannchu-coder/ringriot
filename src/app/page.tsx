@@ -61,7 +61,7 @@ export default function Home() {
               );
             })}
             <div className="sticker absolute -right-4 top-[150px] z-40 rotate-[8deg] rounded-2xl bg-panel px-3 py-2 text-sm font-extrabold">
-              &ldquo;The lamp flickered. ONCE.&rdquo;
+              &ldquo;HYPER TOASTER STRIKE!!&rdquo;
             </div>
           </div>
         </div>
@@ -97,7 +97,7 @@ export default function Home() {
           <h2 className="text-4xl md:text-5xl">How it works</h2>
           <ol className="mt-8 grid gap-5 md:grid-cols-3">
             {[
-              ["Pick a weirdo", "Eight originals, from a soap-opera customer to a detective hunting a stapler."],
+              ["Pick a weirdo", "An anime rival, a speed-demon granny, a superhero pickle, an evil cupcake and more. All original."],
               ["Talk back", "Type or use your mic. They react to what you actually say, in their own voice."],
               ["Clip it", "Get a hook and caption from the funniest line, ready for TikTok, Reels or Shorts."],
             ].map(([t, d], i) => (

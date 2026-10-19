@@ -66,7 +66,7 @@ export default async function Dashboard() {
           <div className="sticker rounded-3xl bg-panel p-5">
             <h2 className="text-lg font-bold">Recent conversations</h2>
             {!sessions?.length ? (
-              <p className="mt-3 text-sm text-ink/70">Nothing yet. <Link href="/demo" className="underline">Start your first one</Link>. Delores is waiting.</p>
+              <p className="mt-3 text-sm text-ink/70">Nothing yet. <Link href="/demo" className="underline">Start your first one</Link>. Blaze is waiting.</p>
             ) : (
               <ul className="mt-3 divide-y divide-line text-sm">
                 {sessions.map((s) => {
