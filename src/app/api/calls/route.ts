@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (!withinQuietHours()) {
-    return NextResponse.json({ error: "quiet_hours", message: "Calls can only be sent between 8am and 9pm. Try again later." }, { status: 429 });
+    // Rule: 8am-9pm in BOTH Eastern and Pacific time, i.e. 11am-9pm ET / 8am-6pm PT. Say that exactly.
+    return NextResponse.json({ error: "quiet_hours", message: "Calls can only be sent 8am–6pm Pacific (11am–9pm Eastern). Try again then." }, { status: 429 });
   }
 
   const toHash = hashNumber(to);

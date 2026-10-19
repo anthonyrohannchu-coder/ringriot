@@ -225,3 +225,13 @@ test("recipient says bye / has to go: one wrap-up line from the AI, then hang up
     assert.equal(out.reason, "recipient_left");
   }
 });
+
+test("quiet hours: allowed only when it's 8am-9pm in BOTH Eastern and Pacific (= 8am-6pm PT)", async () => {
+  const { withinQuietHours } = await import("../src/lib/twilio");
+  const at = (iso: string) => withinQuietHours(new Date(iso));
+  // October 2026: PDT = UTC-7, EDT = UTC-4
+  assert.equal(at("2026-10-19T14:59:00Z"), false, "7:59am PT");
+  assert.equal(at("2026-10-19T15:00:00Z"), true, "8:00am PT / 11am ET");
+  assert.equal(at("2026-10-20T00:59:00Z"), true, "5:59pm PT / 8:59pm ET");
+  assert.equal(at("2026-10-20T01:00:00Z"), false, "6:00pm PT / 9:00pm ET");
+});

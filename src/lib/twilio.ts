@@ -35,6 +35,14 @@ async function post(path: string, form: Record<string, string>) {
   return data;
 }
 
+/** Read-only Twilio GET under this account (used by the admin readiness check). Path like "/IncomingPhoneNumbers.json". */
+export async function twilioGet(path: string) {
+  const res = await fetch(`${base()}${path}`, { headers: { Authorization: auth() }, signal: AbortSignal.timeout(10_000) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Twilio GET ${path.split("?")[0]} ${res.status}: ${data?.message ?? "error"}`);
+  return data;
+}
+
 export async function sendSms(to: string, body: string, fromNumber = configuredCallerNumbers()[0]) {
   if (!fromNumber || !isAllowedCallerNumber(fromNumber)) throw new Error("Caller number is not configured");
   return post("/Messages.json", { To: to, From: fromNumber, Body: body });

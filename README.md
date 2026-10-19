@@ -57,6 +57,13 @@ Try any scenario from your terminal through the same conversation code (no phone
 
 **Before deploying the caller-number picker**, apply `supabase/migrations/0004_call_requests_caller_number.sql` (adds `call_requests.from_e164`); without it every call request fails. `0002_real_calls.sql` documents the table the live project already has; don't run it there.
 
+## Launch checks
+
+- `GET /api/health`: liveness for Render's health check / an uptime pinger (no database, no secrets).
+- `GET /api/admin/readiness` (signed in as an `ADMIN_EMAILS` user; everyone else gets 404): read-only verification of every setting the code needs (env vars, Supabase migrations 0003/0004, Stripe account/prices/webhook/portal, Twilio account type and number ownership/capabilities, app URL vs. this host). Add `?ai=1` to run two real AI turns ("Wait, who is Bernadette?", "Are you an AI?"). Never returns secret values.
+- Migration order for the live project (neither is applied yet): `0004_call_requests_caller_number.sql` (required before deploying this code), then `0003_preserve_referrals_on_account_deletion.sql` (recommended). Both are compatible with the code currently on `main`. Rollbacks: `supabase/rollbacks/0004_down.sql`, `supabase/rollbacks/0003_down.sql` (0003's refuses once any deletion has detached referral history).
+- Quiet hours: consent texts go out only 8am–6pm Pacific (= 8am–9pm in both Eastern and Pacific).
+
 ## Test the payment flow before going live
 
 1. Sign up, open Pricing, buy Plus with card `4242 4242 4242 4242`.
