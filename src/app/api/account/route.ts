@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
 import { stripe, stripeConfigured } from "@/lib/stripe";
-import { deletionActionFor, isTerminal } from "@/lib/billing";
+import { isMissingColumnError, runAccountDeletion, type DeletionSub } from "@/lib/accountDeletion";
 
 const Patch = z.object({
   save_transcripts: z.boolean().optional(),
@@ -19,65 +19,45 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
-type Sub = { id: string; status: string; cancel_at_period_end: boolean; current_period_end: string | null };
-
-/**
- * Delete account.
- * 1. If a paid period is still running and the user hasn't confirmed, stop and tell them (409), so they can
- *    keep what they paid for by canceling in the Customer Portal instead and deleting later.
- * 2. Otherwise stop all billing first: good-standing subscriptions stop renewing at period end (no further
- *    charges); subscriptions with failed payments are canceled now so Stripe stops retrying the card.
- * 3. Only if every Stripe call succeeded, delete the user (profile, credits and history cascade).
- *    If Stripe can't be updated, the account is NOT deleted, so nobody keeps being billed without an account.
- */
+// Delete account. The ordering and rollback rules live in src/lib/accountDeletion.ts.
 export async function DELETE(req: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const body = (await req.json().catch(() => null)) as { confirmForfeit?: boolean } | null;
   const db = supabaseAdmin();
+  const { data: profile } = await db.from("profiles").select("stripe_customer_id").eq("id", user.id).single();
 
-  const { data: profile } = await db.from("profiles").select("plan, stripe_customer_id").eq("id", user.id).single();
-  let subs: Sub[];
-  try {
-    subs = await listSubscriptions(user.id, profile?.stripe_customer_id ?? null);
-  } catch (err) {
-    console.error("delete account: couldn't read subscriptions", err);
-    return NextResponse.json({ error: "billing_unavailable", message: "We couldn't check your subscription, so nothing was deleted. Try again in a moment." }, { status: 502 });
-  }
+  const result = await runAccountDeletion(
+    {
+      billingAvailable: stripeConfigured(),
+      listSubscriptions: () => listSubscriptions(user.id, profile?.stripe_customer_id ?? null),
+      findBlockers: () => referralBlockers(user.id),
+      setCancelAtPeriodEnd: async (id, value) => {
+        await stripe().subscriptions.update(id, { cancel_at_period_end: value });
+      },
+      cancelNow: async (id) => {
+        await stripe().subscriptions.cancel(id);
+      },
+      deleteUser: async () => {
+        const { error } = await db.auth.admin.deleteUser(user.id);
+        if (error) throw error;
+      },
+      audit: async (action, detail) => {
+        const { error } = await db.from("admin_audit_log").insert({ actor: user.id, action, detail });
+        if (error) throw error;
+      },
+      log: (message, err) => console.error(message, err ?? ""),
+    },
+    { confirmForfeit: body?.confirmForfeit === true },
+  );
 
-  const live = subs.filter((s) => !isTerminal(s.status));
-  if (live.length && !stripeConfigured()) {
-    return NextResponse.json({ error: "billing_unavailable", message: "Billing is offline, so nothing was deleted. Email support to close your account." }, { status: 503 });
-  }
-
-  const paidThrough = live
-    .filter((s) => s.status === "active" || s.status === "trialing")
-    .map((s) => s.current_period_end)
-    .filter((d): d is string => !!d)
-    .sort()
-    .pop();
-  if (paidThrough && body?.confirmForfeit !== true) {
-    return NextResponse.json({ error: "active_subscription", paidThrough, plan: profile?.plan ?? null }, { status: 409 });
-  }
-
-  for (const s of live) {
-    const action = deletionActionFor(s.status, s.cancel_at_period_end);
-    try {
-      if (action === "cancel_at_period_end") await stripe().subscriptions.update(s.id, { cancel_at_period_end: true });
-      if (action === "cancel_now") await stripe().subscriptions.cancel(s.id);
-    } catch (err) {
-      console.error("delete account: couldn't stop subscription", s.id, err);
-      return NextResponse.json({ error: "billing_update_failed", message: "We couldn't stop your subscription, so your account was not deleted. Try again or email support." }, { status: 502 });
-    }
-  }
-
-  const { error } = await db.auth.admin.deleteUser(user.id);
-  if (error) return NextResponse.json({ error: "delete_failed" }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  if (result.ok) return NextResponse.json({ ok: true });
+  const { status, ...rest } = result;
+  return NextResponse.json(rest, { status });
 }
 
 /** Stripe is the source of truth when we know the customer; our mirror table is the fallback. */
-async function listSubscriptions(userId: string, customerId: string | null): Promise<Sub[]> {
+async function listSubscriptions(userId: string, customerId: string | null): Promise<DeletionSub[]> {
   if (customerId && stripeConfigured()) {
     const res = await stripe().subscriptions.list({ customer: customerId, status: "all", limit: 100 });
     return res.data.map((s) => {
@@ -92,5 +72,39 @@ async function listSubscriptions(userId: string, customerId: string | null): Pro
     .select("id, status, cancel_at_period_end, current_period_end")
     .eq("user_id", userId);
   if (error) throw error;
-  return (data ?? []) as Sub[];
+  return (data ?? []) as DeletionSub[];
+}
+
+/**
+ * Referral rows that deletion would break or erase. Once migration 0003 is applied, both sides of a
+ * referral survive deletion (links set to NULL, history kept), so there are no blockers. Until then:
+ *  - a referrer whose code has conversions can't be deleted (the FK would fail), and
+ *  - deleting a referred user would erase their conversion from the referrer's history,
+ * so both are blocked here BEFORE any subscription is touched.
+ */
+async function referralBlockers(userId: string): Promise<string[]> {
+  const db = supabaseAdmin();
+  const probe = await db.from("referral_codes").select("owner_deleted_at").limit(1);
+  if (!probe.error) return [];
+  if (!isMissingColumnError(probe.error, "owner_deleted_at")) throw probe.error;
+
+  const blockers: string[] = [];
+  const { data: codes, error } = await db.from("referral_codes").select("code").eq("user_id", userId);
+  if (error) throw error;
+  if (codes?.length) {
+    const { count, error: convErr } = await db
+      .from("referral_conversions")
+      .select("id", { count: "exact", head: true })
+      .in("code", codes.map((c) => c.code))
+      .neq("referred_user_id", userId);
+    if (convErr) throw convErr;
+    if (count) blockers.push("referrer_has_conversions");
+  }
+  const { count: own, error: ownErr } = await db
+    .from("referral_conversions")
+    .select("id", { count: "exact", head: true })
+    .eq("referred_user_id", userId);
+  if (ownErr) throw ownErr;
+  if (own) blockers.push("referred_user_has_conversion");
+  return blockers;
 }

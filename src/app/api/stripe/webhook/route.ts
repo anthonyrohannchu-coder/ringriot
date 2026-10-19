@@ -201,6 +201,7 @@ async function recordReferral(userId: string, invoiceId: string, amountPaid: num
   if (!conv) return;
   const { data: code } = await db.from("referral_codes").select("commission_rate, user_id").eq("code", conv.code).single();
   if (!code || code.user_id === userId) return; // no self-referrals
+  if (!code.user_id) return; // referrer deleted their account (migration 0003): keep history, accrue no new commission
   await db.from("referral_conversions").upsert(
     {
       code: conv.code,

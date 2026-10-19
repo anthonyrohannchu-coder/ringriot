@@ -83,9 +83,9 @@ export function DeleteAccount() {
         const del = (confirmForfeit: boolean) =>
           fetch("/api/account", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmForfeit }) });
         let r = await del(false);
-        if (r.status === 409) {
+        let d = await r.json().catch(() => ({}));
+        if (r.status === 409 && d.error === "active_subscription") {
           // A paid period is still running: say so before giving it up.
-          const d = await r.json().catch(() => ({}));
           const until = d.paidThrough ? new Date(d.paidThrough).toLocaleDateString() : "the end of your billing period";
           const ok = confirm(
             `Your plan is paid through ${until}. To keep using it, cancel from "Manage billing" instead and delete your account after that date.\n\n` +
@@ -93,10 +93,10 @@ export function DeleteAccount() {
           );
           if (!ok) { setBusy(false); return; }
           r = await del(true);
+          d = await r.json().catch(() => ({}));
         }
         if (r.ok) { await supabaseBrowser().auth.signOut(); window.location.href = "/"; }
         else {
-          const d = await r.json().catch(() => ({}));
           alert(d.message ?? "Couldn't delete the account. Email support.");
           setBusy(false);
         }

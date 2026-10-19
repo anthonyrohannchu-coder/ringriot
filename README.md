@@ -35,8 +35,10 @@ This was written without being able to run `npm install` (the build sandbox had 
 
 ## Automated tests
 
-- `npm test`: billing rules (price → plan mapping, which invoices grant credits, out-of-order events, account-deletion handling), run against a copy of a real sandbox invoice.
-- `tests/sql/`: credit-ledger idempotency checks for a **throwaway local Postgres only** (never your Supabase project): load `supabase_stub.sql`, then `supabase/migrations/0001_init.sql`, then `ledger.test.sql`; `concurrent_grant.sh` fires 10 parallel identical grants.
+- `npm test`: billing rules (price → plan mapping, which invoices grant credits, out-of-order events) and the account-deletion sequence (blocking, ordering, rollback), run with fakes and a copy of a real sandbox invoice.
+- `tests/sql/run.sh "-h <socket-dir> -p <port> -U <user>"`: credit-ledger idempotency and referral/account-deletion checks for a **throwaway local Postgres only** (the script refuses Supabase/Render hosts). It reproduces the referral foreign-key bug on the current schema, applies `supabase/migrations/0003_preserve_referrals_on_account_deletion.sql` twice on existing data, then verifies referral history survives deletion.
+
+**Migration 0003 is not applied anywhere.** Until it is, account deletion is refused (before any subscription is touched) for users who have referral conversions on either side, so history is never erased or left half-deleted.
 
 ## Test the payment flow before going live
 
