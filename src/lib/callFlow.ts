@@ -24,7 +24,7 @@ export type TurnOutcome = {
   turns: number;
   reply: string;
   hangup: boolean;
-  reason: "continue" | "asked_to_stop" | "silence" | "model_ended" | "turn_limit";
+  reason: "continue" | "asked_to_stop" | "silence" | "model_ended" | "turn_limit" | "recipient_left";
   usage: GenerateResult | null;
 };
 
@@ -33,6 +33,8 @@ export const AI_TIMEOUT_MS = 8_000;
 const SILENCE = "(silence)";
 const STOP = /\b(stop|hang up|leave me alone|who is this really|not funny)\b/i;
 const GOODBYE = /\b(bye|goodbye|take care|see ya|later)\b/i;
+/** The recipient is wrapping up: give the character one last line, then hang up. */
+const LEAVING = /\b(bye|goodbye|(?:have|got|need) to go|gotta go|hanging up|talk (?:to you )?later)\b/i;
 
 export function callContext(r: CallRequest): { character: Character; scenario: Scenario } {
   const character = getCharacter(r.character_id);
@@ -89,7 +91,8 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
     return finish(`Hello? ...I think I lost you. ${sender} says hi. Bye!`, "silence");
   }
 
-  const repliesLeft = Math.max(1, maxTurns - r.turns);
+  const leaving = LEAVING.test(said);
+  const repliesLeft = leaving ? 1 : Math.max(1, maxTurns - r.turns);
   const last = repliesLeft <= 1;
   const history = transcript.slice(1).map((t) => (t.text === SILENCE ? { ...t, text: "(they said nothing)" } : t));
 
@@ -112,7 +115,7 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
   if (last) {
     // The model was told this is the last line; make sure it actually lands and says goodbye.
     if (!GOODBYE.test(reply)) reply += ` Anyway, I gotta go. ${sender} says hi. Bye!`;
-    return finish(reply, "turn_limit", usage);
+    return finish(reply, leaving ? "recipient_left" : "turn_limit", usage);
   }
   return finish(reply, "continue", usage);
 }

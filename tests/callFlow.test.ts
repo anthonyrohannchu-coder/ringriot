@@ -215,3 +215,13 @@ test("no AI key: a scripted call ends on the scenario's goodbye line", async () 
   assert.equal(out!.turns, 5);
   assert.equal(out!.reply, "Bernadette forgives you. Drive safe. Bye!");
 });
+
+test("recipient says bye / has to go: one wrap-up line from the AI, then hang up", async () => {
+  for (const line of ["Okay. I really have to go now.", "bye", "lol I gotta go"]) {
+    const m = fakeModel(["Okay, okay! Anthony set this up. Take care!"]);
+    const out = await nextTurn(base({ transcript: openingTranscript(base()) }), line, m.generate);
+    assert.equal(m.inputs[0].repliesLeft, 1, `${line}: told it's the last line`);
+    assert.equal(out.hangup, true);
+    assert.equal(out.reason, "recipient_left");
+  }
+});

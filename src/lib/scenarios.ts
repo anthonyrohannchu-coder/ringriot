@@ -257,7 +257,7 @@ export const scenarioAdditions: Record<string, Scenario[]> = {
       opener: "Hello! Is this the owner of the dog? Lovely dog. Very confident. He left a little present on my petunias, and I just have some questions.",
       fallbackLines: [
         "It was right in the middle of the petunias. Perfect placement. Like he planned it.",
-        "What's his name? I want to thank him personally. Well, not thank. Address him.",
+        "What's his name? I want to thank him personally. Well, not thank. Have a word with him.",
         "Reminds me of my old dog Biscuit, 1961. He did his business on the mayor's shoe.",
         "Mr. Buttons is in the window glaring. He takes the petunias very seriously.",
         "You tell that dog he's welcome for lemonade anytime. Bye now!",
