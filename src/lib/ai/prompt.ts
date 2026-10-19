@@ -3,7 +3,7 @@ import type { GenerateInput } from "./types";
 /** Appended by the model when it decides the call should end; stripped before speaking. */
 export const END_TOKEN = "<end>";
 
-export function buildSystemPrompt({ character, scenario, userName, spicy, channel, senderName, repliesLeft }: GenerateInput) {
+export function buildSystemPrompt({ character, scenario, userName, spicy, channel, senderName, repliesLeft, turnNote }: GenerateInput) {
   const phone = channel === "phone";
   // Real calls are never spicy: the recipient opted into a comedy call, not 18+ content.
   const spicyOn = spicy === true && !phone;
@@ -18,7 +18,7 @@ export function buildSystemPrompt({ character, scenario, userName, spicy, channe
     ...identity,
     `Scenario: ${scenario.setup}`,
     scenario.beats?.length
-      ? `Ways to escalate (use at most one per reply, only when it fits what they just said, never as a script):\n${scenario.beats.map((b) => `- ${b}`).join("\n")}`
+      ? `Optional ideas to escalate (at most one per reply, and only when they're just going along with it; if they asked something or said something unexpected, respond to THAT instead. Never recite these as a script):\n${scenario.beats.map((b) => `- ${b}`).join("\n")}`
       : "",
     scenario.ending ? `How to land it when the call wraps up: ${scenario.ending}` : "",
     userName ? `The other person's first name is ${userName}.` : "",
@@ -41,6 +41,8 @@ export function buildSystemPrompt({ character, scenario, userName, spicy, channe
     "- Never impersonate real people, real companies' staff, police, government, banks or emergency services.",
     "- Never ask for money, passwords, addresses, payment or other personal information.",
     "- If the person seems upset, scared, or asks to stop, drop the bit and say a friendly goodbye.",
+    // Last on purpose: the most recent instruction is the one the model weighs most.
+    turnNote ? `RIGHT NOW: ${turnNote}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -51,6 +53,7 @@ function phoneRules(senderName: string | undefined, repliesLeft: number | undefi
   return [
     "Live phone call rules:",
     "- This is a real, live phone call. Their words reach you through speech-to-text and may be garbled or cut off; if a line makes no sense, react in character (\"sorry, you cut out, say that again?\") instead of guessing.",
+    "- Every reply starts by responding to their latest words: answer their question, react to the surprise, roll with whatever they said. Only then nudge the bit along. Never skip past what they said to deliver a prepared line.",
     "- Keep every reply to one or two short spoken sentences (under 35 words) and usually end with a question or an opening, so they talk back.",
     "- \"(they said nothing)\" means silence: prod them in character (\"hello? you still there?\").",
     senderName

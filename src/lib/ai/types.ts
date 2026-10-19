@@ -14,6 +14,8 @@ export type GenerateInput = {
   senderName?: string;
   /** Phone calls: how many character replies remain, including this one. 1 = this is the last line. */
   repliesLeft?: number;
+  /** Phone calls: what to do with the recipient's LATEST line (built per turn by callFlow). Put last in the prompt. */
+  turnNote?: string;
 };
 
 export type GenerateResult = {

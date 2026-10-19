@@ -31,10 +31,63 @@ export type TurnOutcome = {
 /** Twilio's webhook timeout is 15s; leave room for TTS and network. */
 export const AI_TIMEOUT_MS = 8_000;
 const SILENCE = "(silence)";
-const STOP = /\b(stop|hang up|leave me alone|who is this really|not funny)\b/i;
 const GOODBYE = /\b(bye|goodbye|take care|see ya|later)\b/i;
-/** The recipient is wrapping up: give the character one last line, then hang up. */
-const LEAVING = /\b(bye|goodbye|(?:have|got|need) to go|gotta go|hanging up|talk (?:to you )?later)\b/i;
+
+// ---------- What did the recipient just do? ----------
+// Checked in this order; the first match wins. Stop always beats everything else.
+
+/** Asked to stop / uncomfortable: end immediately, no AI call, no more joke. */
+const STOP =
+  /\b(stop|(?<!don'?t )hang up|leave me alone|who is this really|not funny|isn'?t funny|go away|don'?t call|do not call|quit calling|unsubscribe|i'?m (?:not comfortable|uncomfortable|scared)|you'?re scaring me)\b/i;
+/** Wrapping up: at most one short closing line, then hang up. "I need to go to the store" is not leaving. */
+const LEAVING =
+  /\b(bye|goodbye|bye-bye|gotta go(?! to)|i'?m hanging up|talk (?:to you )?later|ttyl)\b|\b(?:i|we)\b[^.?!]{0,20}\b(?:have|got|need) to go\b(?!\s+(?:to|get|buy|pick|see|do|and)\b)/i;
+/** "Are you an AI / a bot / a real person?" and similar. */
+const AI_QUESTION =
+  /\b(?:are|r)\s+(?:you|u)\s+(?:an?\s+|even\s+|actually\s+|like\s+)*(?:ai|a\.i\.?|bot|robot|computer|machine|recording|real|human|a real person|a person|automated)\b|\bis\s+(?:this|that)\s+(?:an?\s+)?(?:ai|a\.i\.?|bot|robot|recording|computer|real|automated|a real person|a prank)\b|\bam\s+i\s+(?:talking|speaking)\s+(?:to|with)\s+(?:an?\s+)?(?:ai|bot|robot|computer|machine|real person|human|person)\b|\b(?:you'?re|you are)\s+(?:an?\s+)?(?:ai|bot|robot)\b/i;
+/** A reply that honestly admits being an AI (and doesn't deny it). */
+const AI_ADMISSION = /\b(AI|A\.I\.|artificial intelligence)\b/i;
+const AI_DENIAL = /\b(?:not|n'?t|never)\s+(?:an?\s+|really\s+|even\s+)?(?:ai|a\.i\.|bot|robot|computer)\b/i;
+
+export type RecipientIntent = "stop" | "silence" | "leaving" | "ai_question" | "question" | "statement";
+
+export function detectIntent(said: string): RecipientIntent {
+  const s = said.trim();
+  if (!s) return "silence";
+  if (STOP.test(s)) return "stop";
+  if (AI_QUESTION.test(s)) return "ai_question";
+  if (LEAVING.test(s)) return "leaving";
+  if (/\?\s*$/.test(s) || /^(who|what|why|how|where|when|is|are|do|does|did|can|could|would|will|wait,? what)\b/i.test(s)) return "question";
+  return "statement";
+}
+
+export function admitsAI(reply: string) {
+  return AI_ADMISSION.test(reply) && !AI_DENIAL.test(reply);
+}
+
+/** The per-turn instruction, placed last in the system prompt. Quotes their exact words. */
+export function turnNoteFor(intent: RecipientIntent, said: string, sender: string): string {
+  const q = said.replace(/"/g, "'").slice(0, 200);
+  switch (intent) {
+    case "ai_question":
+      return `They asked "${q}". Answer honestly FIRST, in plain words: yes, you're an AI character and this is an AI comedy call ${sender} set up. Never claim to be human. After that you can keep it light, or offer to let them go.`;
+    case "leaving":
+      return `They said "${q}": they're leaving. Reply with ONE short goodbye line (under 15 words), mention ${sender} set this up, and end with ${END_TOKEN}. Do not continue the bit.`;
+    case "question":
+      return `They asked "${q}". Answer that question directly, in character, before anything else. Don't skip past it to a prepared line.`;
+    case "silence":
+      return `They said nothing. Prod them in character ("hello? you still there?").`;
+    default:
+      return `They just said "${q}". React to exactly that first, roll with it even if it's unexpected, then nudge the bit along.`;
+  }
+}
+
+/** Keep a goodbye to one short line; if the model ran long, use a short in-character fallback. */
+export function shortClosing(reply: string, sender: string) {
+  const words = reply.trim().split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 22) return `Okay, okay, I'll let you go. ${sender} set this up. Bye!`;
+  return GOODBYE.test(reply) ? reply : `${reply} Bye!`;
+}
 
 export function callContext(r: CallRequest): { character: Character; scenario: Scenario } {
   const character = getCharacter(r.character_id);
@@ -82,26 +135,30 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
     return { transcript, turns, reply, hangup: reason !== "continue", reason, usage };
   };
 
-  // Safeguard first: the recipient asked to stop. No AI call, friendly exit.
-  if (STOP.test(said)) {
-    return finish(`Okay, okay. I'll let you go. It was just a joke from ${sender}. Have a good one!`, "asked_to_stop");
+  const intent = detectIntent(said);
+
+  // Safeguard first: the recipient asked to stop. End now: no AI call, out of character, no more joke.
+  if (intent === "stop") {
+    return finish(`Okay, sorry about that. It was just a joke from ${sender}. Goodbye.`, "asked_to_stop");
   }
   // Two silent turns in a row: they've walked away or the line is dead.
-  if (!said && trailingSilences(transcript) >= 2) {
+  if (intent === "silence" && trailingSilences(transcript) >= 2) {
     return finish(`Hello? ...I think I lost you. ${sender} says hi. Bye!`, "silence");
   }
 
-  const leaving = LEAVING.test(said);
+  // "Are you an AI? ...bye" is both: answer honestly AND end.
+  const leaving = intent === "leaving" || (intent === "ai_question" && LEAVING.test(said));
   const repliesLeft = leaving ? 1 : Math.max(1, maxTurns - r.turns);
   const last = repliesLeft <= 1;
   const history = transcript.slice(1).map((t) => (t.text === SILENCE ? { ...t, text: "(they said nothing)" } : t));
+  const turnNote = turnNoteFor(intent, said, sender);
 
   let usage: GenerateResult | null = null;
   let reply: string;
   let modelEnded = false;
   try {
     usage = await generate(
-      { character, scenario, history, channel: "phone", senderName: sender, repliesLeft },
+      { character, scenario, history, channel: "phone", senderName: sender, repliesLeft, turnNote },
       AbortSignal.timeout(AI_TIMEOUT_MS),
     );
     const parsed = parseModelReply(usage.text);
@@ -109,6 +166,22 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
     modelEnded = parsed.end;
   } catch {
     reply = "Hello? You're breaking up. Say that again?";
+  }
+
+  // Leaving: at most one short closing line, then hang up, whatever the model did.
+  if (leaving) {
+    let closing = shortClosing(reply, sender);
+    if (intent === "ai_question" && !admitsAI(closing)) closing = `Yep, it's an AI comedy call from ${sender}. Bye!`;
+    return finish(closing, "recipient_left", usage);
+  }
+
+  // Asked if this is AI: the answer must be honest. If the model dodged or denied it (or there's no
+  // AI and the scripted line ignored the question), answer plainly instead of continuing the bit.
+  if (intent === "ai_question" && !admitsAI(reply)) {
+    reply = last
+      ? `Honest answer? Yeah, I'm an AI character. This was an AI comedy call ${sender} set up for you. Bye!`
+      : `Honest answer? Yeah, I'm an AI character. This is an AI comedy call ${sender} set up for you. Want me to keep going, or should I let you go?`;
+    modelEnded = false;
   }
 
   if (modelEnded) return finish(reply, "model_ended", usage);
