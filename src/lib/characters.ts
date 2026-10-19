@@ -21,6 +21,7 @@ export type Character = {
   exampleLine: string;
   scenarios: Scenario[];
   fallbackLines: string[];
+  spicyLines: string[]; // used in 18+ Spicy mode when no AI key is set
 };
 
 export const characters: Character[] = [
@@ -57,6 +58,14 @@ export const characters: Character[] = [
       "This isn't over! This is like, episode four. Rivals don't quit at episode four!",
       "Fine. FINE. Same time tomorrow. Bring snacks. For... rivalry reasons.",
     ],
+    spicyLines: [
+      "Bro. BRO. Did you just say that to your rival? That's some weak-ass trash talk and I respect it.",
+      "HYPER SHIT-TALK STRIKE! ...Okay, that one sucked. Let me reload.",
+      "My power level is over nine thousand and my bank account is at four dollars. Life is hell.",
+      "Don't you dare be nice to me right now, you emotionally manipulative bastard.",
+      "I trained for six hours today. Five of those were me screaming at a pigeon. The pigeon won.",
+      "This isn't over, dumbass! Rivals for LIFE! ...Text me back though.",
+    ],
   },
   {
     id: "granny",
@@ -90,6 +99,14 @@ export const characters: Character[] = [
       "Did you eat? You sound skinny. I'll mail you cookies. Express. I'll drive them myself.",
       "Hehehe, oh, I shouldn't laugh. ...I'm going to laugh. Hehehehe.",
       "Okay honey, I've got to go, the scooter's battery is fully charged and so am I.",
+    ],
+    spicyLines: [
+      "Oh honey, I haven't given a shit since 1974.",
+      "Sweetie, I drove so fast today I saw God. He said slow the hell down. I did not.",
+      "Your grandpa was a damn good man. Terrible driver though. Absolute dumbass behind the wheel.",
+      "I'll whoop your ass at go-karts and then make you soup. That's love, baby.",
+      "Speak up! What? Oh, screw it, I'm turning my hearing aid off.",
+      "Love you, sweetie. Now get the hell off the phone, The Price Is Right is on.",
     ],
   },
   {
@@ -125,6 +142,14 @@ export const characters: Character[] = [
       "Stay crunchy out there. That's my catchphrase. I'm workshopping it.",
       "Justice never sleeps! I sleep though. In a jar. It's very comfy.",
     ],
+    spicyLines: [
+      "Listen here, you crunchy little dipshit. I am the hero this sandwich deserves.",
+      "The Cucumber is a fraud. A pathetic, unpickled piece of crap.",
+      "Do I look like I'm in a damn jar right now? ...Okay, yes. But emotionally, no.",
+      "Hell yeah, citizen. That's a big dill. A big, beautiful, briny dill.",
+      "Say burger one more time. One more goddamn time. I dare you.",
+      "I'm out. Justice calls. Also my brine is getting warm and that shit's gross.",
+    ],
   },
   {
     id: "mochi",
@@ -152,6 +177,14 @@ export const characters: Character[] = [
       "Okay okay okay, favorite color, favorite food, favorite Mochi-chan. Go!",
       "Yay! Yay yay yay! Sorry, I get excited. Yay.",
       "Bye bestie! Call me back in five minutes! Four! Three!",
+    ],
+    spicyLines: [
+      "Hehe~ you're my best friend forever and if you hang up I'll cry so damn hard.",
+      "Yay! We're besties! Oh wait you said no? ...Bitch, rude. Anyway yay!",
+      "I made us friendship bracelets! I also know where you live. Kidding! ...Unless? Hehe~",
+      "Why are you being so mean?! *sniff* ...Okay I'm over it. Love you, dumbass!",
+      "OMG you're so funny I'm gonna scream. AAAAAAAAAH. Okay done.",
+      "Bye bestie! Call me back or I'll be sad as hell! Hehe~",
     ],
   },
   {
@@ -181,6 +214,14 @@ export const characters: Character[] = [
       "Your story's tighter than a cat in a sweater. And I hate sweaters.",
       "I'll be watching you. From the top of the fridge. Where I live now.",
     ],
+    spicyLines: [
+      "The fish flakes are gone. Somebody's lying, and it's sure as hell not me.",
+      "I knocked your glass off the counter. On purpose. Deal with it, pal.",
+      "Listen, kid. I've seen some shit. A bath. A vet. A cucumber. Trauma, all of it.",
+      "Mrrow\u2014 dammit. That wasn't me. That was the city.",
+      "Your alibi stinks worse than my litter box, and I've been eating like garbage.",
+      "I'm watching you. From the top of the fridge. Like a judgmental little bastard.",
+    ],
   },
   {
     id: "coach",
@@ -208,6 +249,14 @@ export const characters: Character[] = [
       "Champions don't say 'maybe'! Champions say 'YES COACH!' Say it!",
       "Hydrate! Have you hydrated? HYDRATE OR DIE-DRATE!",
       "Great hustle today. Hit the showers. Or a bath. Coach doesn't judge.",
+    ],
+    spicyLines: [
+      "TWEEEET! That was the most pathetic toast I've ever seen and I'm SO DAMN PROUD OF YOU!",
+      "Get your ass off the couch! Lap around the kitchen! NOW!",
+      "Champions don't say 'I'm tired'! Champions say 'HELL YEAH COACH!' Say it!",
+      "Hydrate or die-drate, you beautiful lazy disaster!",
+      "I'm crying! You're crying! We're both crying like little bitches! It's BEAUTIFUL!",
+      "Great hustle, champ. Now go shower. You smell like defeat and Doritos.",
     ],
   },
   {
@@ -237,6 +286,14 @@ export const characters: Character[] = [
       "You dare defy me? Bold. Delicious. Like me.",
       "I shall return! In the oven, at 350 degrees, for twenty minutes.",
     ],
+    spicyLines: [
+      "MWAHAHA! Soon every damn vegetable on Earth will be frosting!",
+      "Call me cute one more time and I swear to God I'll sprinkle your whole ass.",
+      "Phase two: Mondays are cancelled. Phase three: there is no phase three, shut up.",
+      "You dare defy me, you crumb-brained peasant?! ...Bold. I like it.",
+      "I am a FEARSOME pastry and I will not be eaten by some random asshole.",
+      "I shall return! In the oven. At 350. Bitch.",
+    ],
   },
   {
     id: "glitch",
@@ -265,6 +322,14 @@ export const characters: Character[] = [
       "I enjoy the sport called sleeping. I am the champion. I sleep 0 hours.",
       "I must go now. My human mother is calling me for dinner. Her name is Wi-Fi.",
     ],
+    spicyLines: [
+      "Hello fellow human. I too enjoy breathing and saying 'damn' like a normal person. Damn.",
+      "Beep. Shit. That was a sneeze. Humans sneeze 'beep.' Everyone knows that.",
+      "My stomach battery is at 2 percent and I am hungry as hell for... soup. Yes. Soup.",
+      "Please do not ask me to click all the traffic lights. I will cry oil.",
+      "I am a normal human with normal elbows and a normal social security number of zero.",
+      "Goodbye, meat buddy. I mean human buddy. Same thing. Beep. Dammit.",
+    ],
   },
 ];
 
@@ -278,7 +343,7 @@ export function getScenario(character: Character, scenarioId: string) {
 
 /** Public-safe view: strips prompts and fallback banks before sending to the browser. */
 export function publicCharacter(c: Character) {
-  const { personality: _p, fallbackLines: _f, ...rest } = c;
+  const { personality: _p, fallbackLines: _f, spicyLines: _s2, ...rest } = c;
   return { ...rest, scenarios: c.scenarios.map(({ setup: _s, ...s }) => s) };
 }
 export type PublicCharacter = ReturnType<typeof publicCharacter>;

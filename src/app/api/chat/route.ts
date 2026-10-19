@@ -11,6 +11,7 @@ const Body = z.object({
   requestId: z.string().uuid(), // client-generated; makes "start session" idempotent
   characterId: z.string().max(40),
   scenarioId: z.string().max(60),
+  spicy: z.boolean().optional(),
   history: z.array(z.object({ role: z.enum(["user", "character"]), text: z.string().max(600) })).max(30),
 });
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "bad_request" }, { status: 400 });
-  const { sessionId, requestId, characterId, scenarioId, history } = parsed.data;
+  const { sessionId, requestId, characterId, scenarioId, history, spicy } = parsed.data;
 
   const db = supabaseAdmin();
   const { data: profile } = await db.from("profiles").select("plan, suspended, save_transcripts").eq("id", user.id).single();
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await getProvider().generate({ character, scenario, history });
+    const result = await getProvider().generate({ character, scenario, history, spicy: spicy === true });
     const turns = session.turns + 1;
     const transcript = profile.save_transcripts
       ? [...history, { role: "character", text: result.text }]

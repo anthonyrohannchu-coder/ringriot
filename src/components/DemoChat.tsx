@@ -60,6 +60,8 @@ export function DemoChat({
   const [provider, setProvider] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
+  const [spicy, setSpicy] = useState(false);
+  const [ageAsk, setAgeAsk] = useState(false);
   const [clip, setClip] = useState<{ hook: string; caption: string } | null>(null);
   const requestId = useRef<string>("");
   const logRef = useRef<HTMLDivElement>(null);
@@ -156,6 +158,7 @@ export function DemoChat({
           characterId: character.id,
           scenarioId: scenario.id,
           history,
+          spicy,
           ...(mode === "paid" ? { requestId: requestId.current, sessionId: sessionId ?? undefined } : {}),
         }),
       });
@@ -252,6 +255,32 @@ export function DemoChat({
             ))}
           </div>
         </div>
+        <div>
+          <p className="label mb-3">3 · Pick the vibe</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => { setSpicy(false); setAgeAsk(false); }}
+              className={`sticker-sm rounded-full px-4 py-2 text-sm font-bold ${!spicy ? "bg-ink text-paper" : "press bg-panel"}`}
+            >
+              😇 Clean
+            </button>
+            <button
+              onClick={() => (spicy ? null : setAgeAsk(true))}
+              className={`sticker-sm rounded-full px-4 py-2 text-sm font-bold ${spicy ? "bg-nope text-white" : "press bg-panel"}`}
+            >
+              🌶 Spicy (18+)
+            </button>
+          </div>
+          {ageAsk && !spicy && (
+            <div className="rise sticker-sm mt-3 rounded-2xl bg-volt p-3 text-sm font-semibold">
+              Spicy mode swears and roasts you. You need to be 18+.
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => { setSpicy(true); setAgeAsk(false); }} className="sticker-sm press rounded-full bg-nope px-3 py-1 text-xs font-extrabold text-white">I'm 18+, turn it on</button>
+                <button onClick={() => setAgeAsk(false)} className="sticker-sm press rounded-full bg-panel px-3 py-1 text-xs font-extrabold">Nah</button>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="sticker tilt-l hidden rounded-2xl bg-panel p-4 lg:block">
           <p className="label text-hot">Sample line</p>
           <p className="mt-1 text-lg font-bold">&ldquo;{character.exampleLine}&rdquo;</p>
@@ -312,7 +341,7 @@ export function DemoChat({
                   </button>
                 </div>
                 <div className="border-b-2 border-ink/15 bg-panel px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-ink/60">
-                  ◉ Simulation · not a real phone call
+                  ◉ Simulation · not a real phone call{spicy && <span className="text-nope"> · 🌶 spicy</span>}
                   {provider === "scripted" && <span> · scripted lines</span>}
                 </div>
 

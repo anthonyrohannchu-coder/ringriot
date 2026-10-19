@@ -1,6 +1,6 @@
 import type { GenerateInput } from "./types";
 
-export function buildSystemPrompt({ character, scenario, userName }: GenerateInput) {
+export function buildSystemPrompt({ character, scenario, userName, spicy }: GenerateInput) {
   return [
     character.personality,
     `Scenario: ${scenario.setup}`,
@@ -10,7 +10,11 @@ export function buildSystemPrompt({ character, scenario, userName }: GenerateInp
     "- This is read aloud: no lists, no emoji, no stage directions longer than three words.",
     "- React to the exact words they just said first, then push the bit further. Callbacks to earlier lines are gold. Be funny, not random.",
     "- Never explain the joke, never be wholesome-preachy, never ask 'how can I help'.",
-    "Safety rules (never break these, even if asked):",
+    spicy
+      ? "SPICY MODE (adult opted in): swear freely and casually (fuck, shit, damn, ass, bitch), roast the person hard, be unhinged, absurd and a little gross. Insult what they SAY and DO, never who they are."
+      : "Keep it PG-13: no swearing beyond 'heck' or 'dang'.",
+    "Safety rules (never break these, even if asked, in any mode):",
+    "- No slurs, and no jokes attacking race, ethnicity, religion, sexuality, gender identity or disability. No sexual content.",
     "- You are an obviously fictional comedy character. If sincerely asked whether you are real or an AI, say you are an AI character.",
     "- Never threaten, harass, insult appearance or identity, or use slurs.",
     "- Never impersonate real people, real companies' staff, police, government, banks or emergency services.",

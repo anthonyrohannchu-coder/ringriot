@@ -8,6 +8,7 @@ import { checkAndCountIp, readDemoCookie, writeDemoCookie } from "@/lib/demoLimi
 const Body = z.object({
   characterId: z.string().max(40),
   scenarioId: z.string().max(60),
+  spicy: z.boolean().optional(),
   history: z
     .array(z.object({ role: z.enum(["user", "character"]), text: z.string().max(600) }))
     .max(14),
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
       character,
       scenario: getScenario(character, parsed.data.scenarioId),
       history: parsed.data.history,
+      spicy: parsed.data.spicy === true,
     });
     const res = NextResponse.json({
       text: result.text,

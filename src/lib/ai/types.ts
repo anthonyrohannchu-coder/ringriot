@@ -7,6 +7,7 @@ export type GenerateInput = {
   scenario: Scenario;
   history: ChatTurn[];
   userName?: string;
+  spicy?: boolean; // 18+ opt-in: swearing and roasts allowed
 };
 
 export type GenerateResult = {
