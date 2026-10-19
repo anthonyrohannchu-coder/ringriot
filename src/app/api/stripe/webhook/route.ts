@@ -3,20 +3,34 @@ import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { grantCredits } from "@/lib/credits";
-import { creditPack, planForPriceId, plans } from "@/config/plans";
+import { creditPack, plans } from "@/config/plans";
+import { planForPrice } from "@/lib/stripeSetup";
 
 // The ONLY place paid entitlements are granted. Never trust the success page.
+// Authenticity: if STRIPE_WEBHOOK_SECRET matches, the signature is verified. Otherwise the
+// event is re-fetched from Stripe with our secret key, so a forged payload can't grant anything.
 export async function POST(req: NextRequest) {
+  const raw = await req.text();
   const sig = req.headers.get("stripe-signature");
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!sig || !secret) return NextResponse.json({ error: "missing signature" }, { status: 400 });
 
-  let event: Stripe.Event;
-  try {
-    event = stripe().webhooks.constructEvent(await req.text(), sig, secret);
-  } catch (err) {
-    console.error("webhook signature failed", err);
-    return NextResponse.json({ error: "invalid signature" }, { status: 400 });
+  let event: Stripe.Event | null = null;
+  if (sig && secret) {
+    try {
+      event = stripe().webhooks.constructEvent(raw, sig, secret);
+    } catch {
+      event = null; // secret may belong to another account; fall through to re-fetch
+    }
+  }
+  if (!event) {
+    try {
+      const id = (JSON.parse(raw) as { id?: string }).id;
+      if (!id || !id.startsWith("evt_")) throw new Error("no event id");
+      event = await stripe().events.retrieve(id);
+    } catch (err) {
+      console.error("webhook verification failed", err);
+      return NextResponse.json({ error: "unverified event" }, { status: 400 });
+    }
   }
 
   const db = supabaseAdmin();
@@ -49,7 +63,7 @@ export async function POST(req: NextRequest) {
         if (!userId) break;
         const item = sub.items.data[0];
         const priceId = item?.price?.id ?? null;
-        const plan = planForPriceId(priceId) ?? "free";
+        const plan = (await planForPrice(priceId)) ?? "free";
         // current_period_end lives on the item in newer API versions, on the sub in older ones.
         const periodEnd =
           (item as unknown as { current_period_end?: number })?.current_period_end ??
@@ -74,7 +88,7 @@ export async function POST(req: NextRequest) {
         const userId = await userForCustomer(String(inv.customer));
         if (!userId) break;
         const priceId = invoicePriceId(inv);
-        const plan = planForPriceId(priceId);
+        const plan = await planForPrice(priceId);
         if (plan && plan !== "free") {
           // Monthly allowance on first payment and every renewal; keyed by invoice so retries can't double-grant.
           await grantCredits(userId, plans[plan].monthlyCredits, `invoice:${inv.id}`, `${plan} monthly credits`);

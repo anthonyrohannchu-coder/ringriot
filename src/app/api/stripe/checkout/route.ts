@@ -3,14 +3,10 @@ import { z } from "zod";
 import { stripe, stripeConfigured } from "@/lib/stripe";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
 import { brand } from "@/config/brand";
+import { ensureStripeSetup } from "@/lib/stripeSetup";
 
 const Body = z.object({ product: z.enum(["plus", "pro", "credits_25"]) });
 
-const priceFor = {
-  plus: () => process.env.STRIPE_PRICE_PLUS,
-  pro: () => process.env.STRIPE_PRICE_PRO,
-  credits_25: () => process.env.STRIPE_PRICE_CREDITS_25,
-};
 
 export async function POST(req: NextRequest) {
   if (!stripeConfigured()) return NextResponse.json({ error: "stripe_not_configured" }, { status: 501 });
@@ -19,8 +15,13 @@ export async function POST(req: NextRequest) {
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "bad_request" }, { status: 400 });
-  const price = priceFor[parsed.data.product]();
-  if (!price) return NextResponse.json({ error: "price_not_configured" }, { status: 501 });
+  let price: string;
+  try {
+    price = (await ensureStripeSetup())[parsed.data.product];
+  } catch (err) {
+    console.error("stripe setup failed", err);
+    return NextResponse.json({ error: "stripe_setup_failed", message: "Payments are being set up. Try again in a minute." }, { status: 503 });
+  }
 
   const db = supabaseAdmin();
   const { data: profile } = await db.from("profiles").select("stripe_customer_id, plan, referred_by_code").eq("id", user.id).single();
