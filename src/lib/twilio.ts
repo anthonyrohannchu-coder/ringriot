@@ -2,10 +2,20 @@ import crypto from "node:crypto";
 import { brand } from "@/config/brand";
 
 // Minimal Twilio REST client + helpers (no SDK needed).
-// Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER (+1XXXXXXXXXX).
+// Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBERS (comma-separated E.164 numbers).
+
+/** Configured outbound caller IDs; use only numbers purchased and verified on this account. */
+export function configuredCallerNumbers(): string[] {
+  const raw = process.env.TWILIO_PHONE_NUMBERS || process.env.TWILIO_PHONE_NUMBER || "";
+  return [...new Set<string>(raw.split(",").map((n: string) => n.trim()).filter((n: string) => /^\+1\d{10}$/.test(n)))];
+}
 
 export function twilioConfigured() {
-  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER);
+  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && configuredCallerNumbers().length);
+}
+
+export function isAllowedCallerNumber(number: string) {
+  return configuredCallerNumbers().includes(number);
 }
 
 const sid = () => process.env.TWILIO_ACCOUNT_SID!;
@@ -25,15 +35,17 @@ async function post(path: string, form: Record<string, string>) {
   return data;
 }
 
-export async function sendSms(to: string, body: string) {
-  return post("/Messages.json", { To: to, From: process.env.TWILIO_PHONE_NUMBER!, Body: body });
+export async function sendSms(to: string, body: string, fromNumber = configuredCallerNumbers()[0]) {
+  if (!fromNumber || !isAllowedCallerNumber(fromNumber)) throw new Error("Caller number is not configured");
+  return post("/Messages.json", { To: to, From: fromNumber, Body: body });
 }
 
-export async function startCall(to: string, requestId: string) {
+export async function startCall(to: string, requestId: string, fromNumber = configuredCallerNumbers()[0]) {
   const app = brand.appUrl;
+  if (!fromNumber || !isAllowedCallerNumber(fromNumber)) throw new Error("Caller number is not configured");
   return post("/Calls.json", {
     To: to,
-    From: process.env.TWILIO_PHONE_NUMBER!,
+    From: fromNumber,
     Url: `${app}/api/twilio/voice?req=${requestId}&sig=${sign(requestId)}`,
     StatusCallback: `${app}/api/twilio/status`,
     StatusCallbackEvent: "initiated ringing answered completed",
@@ -48,17 +60,17 @@ export async function fetchRecording(recordingSid: string) {
 }
 
 /** Point the Twilio number's incoming-SMS webhook at this site (idempotent). */
-let numberConfigured = false;
-export async function ensureNumberWebhook() {
-  if (numberConfigured) return;
-  const num = process.env.TWILIO_PHONE_NUMBER!;
+const configuredWebhookNumbers = new Set<string>();
+export async function ensureNumberWebhook(num = configuredCallerNumbers()[0]) {
+  if (!num || !isAllowedCallerNumber(num)) throw new Error("Caller number is not configured");
+  if (configuredWebhookNumbers.has(num)) return;
   const res = await fetch(`${base()}/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(num)}`, { headers: { Authorization: auth() } });
   const data = await res.json();
   const n = data?.incoming_phone_numbers?.[0];
   if (!n) throw new Error("TWILIO_PHONE_NUMBER is not a number on this Twilio account");
   const smsUrl = `${brand.appUrl}/api/twilio/sms`;
   if (n.sms_url !== smsUrl) await post(`/IncomingPhoneNumbers/${n.sid}.json`, { SmsUrl: smsUrl, SmsMethod: "POST" });
-  numberConfigured = true;
+  configuredWebhookNumbers.add(num);
 }
 
 // ---------- safety + limits ----------

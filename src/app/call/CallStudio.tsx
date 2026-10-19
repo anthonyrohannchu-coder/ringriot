@@ -26,13 +26,21 @@ export function CallStudio({ characters, plan, credits }: { characters: PublicCh
   const [scenarioId, setScenarioId] = useState(character.scenarios[0].id);
   const [senderName, setSenderName] = useState("");
   const [phone, setPhone] = useState("");
+  const [callerNumbers, setCallerNumbers] = useState<string[]>([]);
+  const [callerNumber, setCallerNumber] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/calls");
-    if (r.ok) setCalls((await r.json()).calls);
+    if (r.ok) {
+      const data = await r.json();
+      setCalls(data.calls);
+      const numbers = Array.isArray(data.callerNumbers) ? data.callerNumbers as string[] : [];
+      setCallerNumbers(numbers);
+      setCallerNumber((current) => current && numbers.includes(current) ? current : (numbers[0] ?? ""));
+    }
   }, []);
 
   useEffect(() => {
@@ -54,7 +62,7 @@ export function CallStudio({ characters, plan, credits }: { characters: PublicCh
       const r = await fetch("/api/calls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senderName, phone, characterId: charId, scenarioId }),
+        body: JSON.stringify({ senderName, phone, callerNumber, characterId: charId, scenarioId }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) setMsg({ text: d.message ?? "Couldn't send that. Try again.", ok: false });
@@ -115,12 +123,29 @@ export function CallStudio({ characters, plan, credits }: { characters: PublicCh
               className="mt-2 h-12 w-full rounded-full border-[2.5px] border-ink bg-paper px-4 font-semibold outline-none focus:bg-white" />
           </label>
           <label className="block">
-            <span className="label">4 · Friend's mobile number</span>
+            <span className="label">4 · Friend Number</span>
             <input id="phone" required type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567"
               className="mt-2 h-12 w-full rounded-full border-[2.5px] border-ink bg-paper px-4 font-semibold outline-none focus:bg-white" />
           </label>
         </div>
-        <button disabled={busy || credits < 3} className="sticker press w-full rounded-full bg-ink py-4 text-lg font-extrabold text-volt disabled:opacity-50">
+        <label className="block">
+          <span className="label">5 · Prank Caller Number</span>
+          <select
+            value={callerNumber}
+            onChange={(e) => setCallerNumber(e.target.value)}
+            disabled={callerNumbers.length === 0}
+            required
+            className="mt-2 h-12 w-full rounded-full border-[2.5px] border-ink bg-paper px-4 font-semibold outline-none focus:bg-white disabled:opacity-60"
+          >
+            {callerNumbers.length === 0
+              ? <option value="">No caller numbers configured yet</option>
+              : callerNumbers.map((number) => <option key={number} value={number}>{number}</option>)}
+          </select>
+          <span className="mt-1 block text-xs font-semibold text-ink/60">
+            Only phone numbers configured on your Twilio account appear here.
+          </span>
+        </label>
+        <button disabled={busy || credits < 3 || callerNumbers.length === 0} className="sticker press w-full rounded-full bg-ink py-4 text-lg font-extrabold text-volt disabled:opacity-50">
           {busy ? "Sending…" : credits < 3 ? "You need 3 credits" : `📞 Send ${character.name}'s call · 3 credits`}
         </button>
         {msg && <p className={`rise sticker-sm rounded-2xl p-3 text-sm font-bold ${msg.ok ? "bg-go text-white" : "bg-volt"}`}>{msg.text}</p>}

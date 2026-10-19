@@ -14,7 +14,7 @@ Brand name is configurable (`NEXT_PUBLIC_BRAND_NAME`, `src/config/brand.ts`).
 | Stripe Checkout, verified webhooks, renewals, failed payments, Customer Portal, credit packs | Built. Needs Stripe test keys + products. **Not verified until you run the test flow below.** |
 | Creator referral links `/r/<code>`, signup attribution, commission records, refund adjustment | Built (tracking only, no automated payouts) |
 | Premium voices (ElevenLabs) for Pro | Built behind a flag; needs key + voice IDs you have rights to |
-| Real phone calls (Phase 4) | **Not built.** Schema has consent + recording tables ready |
+| Real phone calls | Core Twilio SMS-consent → outbound call → AI turns/status/recording routes are present; requires Twilio credentials, provisioned numbers, public HTTPS URL, and migrations 0001 + 0002. Must be tested end to end before launch. |
 | Admin dashboard, analytics overview, video clip rendering | **Not built yet** (next phases) |
 
 This was written without being able to run `npm install` (the build sandbox had no registry access). Run the build once and send me any errors.
@@ -23,7 +23,7 @@ This was written without being able to run `npm install` (the build sandbox had 
 
 1. `npm install`
 2. `cp .env.example .env.local` and fill in values as you go.
-3. **Supabase**: create a project → SQL editor → paste `supabase/migrations/0001_init.sql` → run. Copy URL, anon key, service-role key. In Auth → URL configuration, add `http://localhost:3000/auth/callback` and your production URL.
+3. **Supabase**: create a project → SQL editor → run `supabase/migrations/0001_init.sql`, then `supabase/migrations/0002_real_calls.sql`. Copy URL, anon key, service-role key. In Auth → URL configuration, add `http://localhost:3000/auth/callback` and your production URL.
 4. **AI**: get an Anthropic API key at console.anthropic.com → `ANTHROPIC_API_KEY`. Leave blank to use scripted lines.
 5. **Stripe (test mode)**:
    - Products → create **Plus** ($9.99 monthly), **Pro** ($19.99 monthly), **25 Credits** ($4.99 one-time). Put the three Price IDs in env (`STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_CREDITS_25`; comma-separate to keep older prices mapped). The app never creates or edits Stripe products, prices, webhooks or portal settings.
@@ -39,6 +39,15 @@ This was written without being able to run `npm install` (the build sandbox had 
 - `tests/sql/run.sh "-h <socket-dir> -p <port> -U <user>"`: credit-ledger idempotency and referral/account-deletion checks for a **throwaway local Postgres only** (the script refuses Supabase/Render hosts). It reproduces the referral foreign-key bug on the current schema, applies `supabase/migrations/0003_preserve_referrals_on_account_deletion.sql` twice on existing data, then verifies referral history survives deletion.
 
 **Migration 0003 is not applied anywhere.** Until it is, account deletion is refused (before any subscription is touched) for users who have referral conversions on either side, so history is never erased or left half-deleted.
+
+## Configure Twilio phone calls (not enabled until configured)
+
+1. Provision one or more phone numbers on your Twilio account with SMS and voice capability.
+2. Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBERS` to a comma-separated list of those exact E.164 numbers (for example `+15551234567,+15557654321`). Do not list numbers you do not control.
+3. Set `NEXT_PUBLIC_APP_URL` to the public HTTPS Render URL. Twilio webhooks must be able to reach it.
+4. Apply both Supabase migrations, including `0002_real_calls.sql`, before enabling calls.
+5. Verify the account's regulatory/consent requirements, recording laws, and Twilio messaging/voice setup. Run test calls only to numbers you control or recipients who explicitly opt in.
+6. The call flow texts the recipient first; only an affirmative reply initiates a call. Recording disclosure is provided in the SMS and at the beginning of the call. Test SMS STOP, YES, no-answer refunds, and recording access before launch.
 
 ## Test the payment flow before going live
 

@@ -5,7 +5,7 @@ import { getCharacter, getScenario } from "@/lib/characters";
 import { brand } from "@/config/brand";
 import {
   CALL_CREDIT_COST, RECIPIENT_REQUESTS_PER_DAY, USER_REQUESTS_PER_DAY,
-  ensureNumberWebhook, hashNumber, normalizeNumber, sendSms, twilioConfigured, withinQuietHours,
+  configuredCallerNumbers, ensureNumberWebhook, hashNumber, isAllowedCallerNumber, normalizeNumber, sendSms, twilioConfigured, withinQuietHours,
 } from "@/lib/twilio";
 
 const Body = z.object({
@@ -13,6 +13,7 @@ const Body = z.object({
   phone: z.string().min(7).max(25),
   characterId: z.string().max(40),
   scenarioId: z.string().max(60),
+  callerNumber: z.string().optional(),
 });
 
 const tierRank = { free: 0, plus: 1, pro: 2 } as const;
@@ -26,6 +27,10 @@ export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "bad_request", message: parsed.error.issues[0]?.message ?? "Check the form." }, { status: 400 });
   const { senderName, characterId, scenarioId } = parsed.data;
+  const callerNumber = parsed.data.callerNumber || configuredCallerNumbers()[0];
+  if (!callerNumber || !isAllowedCallerNumber(callerNumber)) {
+    return NextResponse.json({ error: "bad_caller_number", message: "Choose one of the configured caller numbers." }, { status: 400 });
+  }
 
   const to = normalizeNumber(parsed.data.phone);
   if (!to) return NextResponse.json({ error: "bad_number", message: "Enter a US or Canadian mobile number (no toll-free or emergency numbers)." }, { status: 400 });
@@ -66,17 +71,18 @@ export async function POST(req: NextRequest) {
 
   const { data: request, error } = await db
     .from("call_requests")
-    .insert({ user_id: user.id, sender_name: senderName, to_e164: to, to_hash: toHash, character_id: character.id, scenario_id: scenario.id })
+    .insert({ user_id: user.id, sender_name: senderName, to_e164: to, from_e164: callerNumber, to_hash: toHash, character_id: character.id, scenario_id: scenario.id })
     .select("id")
     .single();
   if (error || !request) return NextResponse.json({ error: "server_error" }, { status: 500 });
 
   try {
-    await ensureNumberWebhook();
+    await ensureNumberWebhook(callerNumber);
     await sendSms(
       to,
       `${senderName} sent you a prank call from ${character.name} (${character.archetype}), an AI comedy character on ${brand.name}. ` +
         `The call is recorded and may be shared by ${senderName}. Reply YES to get it now. Reply STOP to never get ${brand.name} texts or calls.`,
+      callerNumber,
     );
   } catch (err) {
     console.error("sms failed", err);
@@ -105,5 +111,5 @@ export async function GET() {
     hasRecording: !!c.recording_sid,
     recording_sid: undefined,
   }));
-  return NextResponse.json({ calls });
+  return NextResponse.json({ calls, callerNumbers: configuredCallerNumbers() });
 }
