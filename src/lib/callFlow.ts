@@ -3,6 +3,7 @@
 import { brand } from "@/config/brand";
 import { getCharacter, getScenario, type Character, type Scenario } from "@/lib/characters";
 import { END_TOKEN } from "@/lib/ai/prompt";
+import { describeAIError, type AIErrorInfo } from "@/lib/ai/errors";
 import type { ChatTurn, GenerateInput, GenerateResult } from "@/lib/ai/types";
 import { elevenlabsAvailable } from "@/lib/tts";
 import { MAX_CALL_TURNS, sign, twiml, xml } from "@/lib/twilio";
@@ -26,6 +27,14 @@ export type TurnOutcome = {
   hangup: boolean;
   reason: "continue" | "asked_to_stop" | "silence" | "model_ended" | "turn_limit" | "recipient_left";
   usage: GenerateResult | null;
+  /**
+   * Where the reply came from: "ai" = a genuine provider response; "scripted" = the no-key line bank;
+   * "fallback" = the AI call FAILED and a canned line was used (see aiError); "safeguard" = a rule
+   * (stop / silence) answered without calling the AI.
+   */
+  source: "ai" | "scripted" | "fallback" | "safeguard";
+  /** Why the AI call failed (secret-free), when source is "fallback". */
+  aiError: AIErrorInfo | null;
 };
 
 /** Twilio's webhook timeout is 15s; leave room for TTS and network. */
@@ -130,9 +139,12 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
   const turns = r.turns + 1;
   const sender = r.sender_name;
 
+  let attempted = false;
+  let aiError: AIErrorInfo | null = null;
   const finish = (reply: string, reason: TurnOutcome["reason"], usage: GenerateResult | null = null): TurnOutcome => {
     transcript.push({ role: "character", text: reply });
-    return { transcript, turns, reply, hangup: reason !== "continue", reason, usage };
+    const source: TurnOutcome["source"] = !attempted ? "safeguard" : aiError ? "fallback" : usage?.provider === "scripted" ? "scripted" : "ai";
+    return { transcript, turns, reply, hangup: reason !== "continue", reason, usage, source, aiError };
   };
 
   const intent = detectIntent(said);
@@ -156,6 +168,7 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
   let usage: GenerateResult | null = null;
   let reply: string;
   let modelEnded = false;
+  attempted = true;
   try {
     usage = await generate(
       { character, scenario, history, channel: "phone", senderName: sender, repliesLeft, turnNote },
@@ -164,7 +177,10 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
     const parsed = parseModelReply(usage.text);
     reply = parsed.text || "Sorry, you cut out. Say that again?";
     modelEnded = parsed.end;
-  } catch {
+  } catch (err) {
+    // Keep the call alive with an in-character line, but record WHY (never the key) so it's visible.
+    aiError = describeAIError(err, process.env.ANTHROPIC_MODEL || "claude-haiku-5-5");
+    usage = null;
     reply = "Hello? You're breaking up. Say that again?";
   }
 

@@ -53,6 +53,8 @@ This was written without being able to run `npm install` (the build sandbox had 
 
 Scenarios live in `src/lib/scenarios.ts` (persona, setup, escalation beats, ending, no-AI fallback lines) and are attached to characters in `src/lib/characters.ts`. On a live call, `src/lib/callFlow.ts` sends the chosen scenario, the full transcript so far, the sender's name and the number of replies left to the AI every turn. The AI can end the call itself (`<end>`), the last turn is always a wrap-up, "stop"/"hang up" ends it without calling the AI, and two silent turns in a row end it.
 
+`npm run call:check` first sends one preflight request and stops with the exact (secret-free) provider error if it's rejected; a real-AI run FAILS if any turn falls back to a canned line. Each transcript line is tagged AI / AI FAILED → fallback / SCRIPTED / safeguard.
+
 Try any scenario from your terminal through the same conversation code (no phone, database or credits): `npm run call:sim -- list`, then e.g. `npm run call:sim -- sal hit-my-car Anthony`. It uses `ANTHROPIC_API_KEY` from your shell if set, otherwise the scripted lines.
 
 **Before deploying the caller-number picker**, apply `supabase/migrations/0004_call_requests_caller_number.sql` (adds `call_requests.from_e164`); without it every call request fails. `0002_real_calls.sql` documents the table the live project already has; don't run it there.

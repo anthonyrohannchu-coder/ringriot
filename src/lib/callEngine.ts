@@ -3,6 +3,7 @@
 import { getProvider } from "@/lib/ai";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { logProviderUsage } from "@/lib/credits";
+import { formatAIError } from "@/lib/ai/errors";
 import { answerTwiml, nextTurn, openingTranscript, turnTwiml, type CallRequest } from "@/lib/callFlow";
 
 export async function loadRequest(id: string) {
@@ -28,6 +29,8 @@ export async function answer(r: CallRequest) {
 /** The recipient said something: reply in character with full context, or wrap up. */
 export async function turn(r: CallRequest, heard: string) {
   const outcome = await nextTurn(r, heard, (input, signal) => getProvider().generate(input, signal));
+  // Previously invisible: a failed AI call silently became "you're breaking up". Log it (secret-free).
+  if (outcome.aiError) console.error(`call ${r.id}: AI turn failed, fallback line used: ${formatAIError(outcome.aiError)}`);
   if (outcome.usage) {
     const u = outcome.usage;
     await logProviderUsage({ user_id: r.user_id, provider: u.provider, kind: "call", units: u.inputTokens + u.outputTokens, cost_usd: u.costUsd }).catch(() => {});

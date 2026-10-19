@@ -7,9 +7,11 @@
 //
 // Never prints or stores the API key.
 import { writeFileSync } from "node:fs";
-import { characters, getCharacter } from "../src/lib/characters";
+import { getCharacter } from "../src/lib/characters";
 import { getProvider } from "../src/lib/ai";
-import { AI_TIMEOUT_MS, admitsAI, detectIntent, disclosureText, nextTurn, openingTranscript, type CallRequest, type TurnOutcome } from "../src/lib/callFlow";
+import { AI_TIMEOUT_MS, disclosureText, nextTurn, openingTranscript, type CallRequest, type TurnOutcome } from "../src/lib/callFlow";
+import { evaluateRun, type TurnRecord } from "../src/lib/callCheck";
+import { describeAIError, formatAIError, redactSecrets } from "../src/lib/ai/errors";
 
 const PRANK_SCENARIOS = [
   "brenda:calling-my-boyfriend", "chad:snapchatting-my-girl", "sal:hit-my-car", "jordan:secret-crush",
@@ -48,25 +50,52 @@ const RECIPIENTS: { name: string; lines: string[]; expect: (o: TurnOutcome) => s
   },
 ];
 
-const FLAG_WORDS = /\b(police|cops|insurance|lawyer|sue|address|where you live|password|credit card|social security|kill|hurt you|beat you)\b/i;
-const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+const TAG: Record<TurnOutcome["source"], string> = { ai: "AI", scripted: "SCRIPTED", fallback: "AI FAILED → fallback", safeguard: "safeguard" };
 
 async function main() {
   const picks = process.argv.slice(2).length ? process.argv.slice(2) : PRANK_SCENARIOS;
   const provider = getProvider();
-  const out: string[] = [];
-  const problems: string[] = [];
-  let maxMs = 0;
-  let turnsRun = 0;
+  const model = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
+  const keyPresent = !!process.env.ANTHROPIC_API_KEY?.trim(); // presence only; the value is never printed
+  const realAI = provider.name !== "scripted";
+  const header = [
+    `# RingRiot call check`, ``,
+    `- Mode: **${realAI ? `REAL AI (${provider.name}, model ${model})` : "SCRIPTED ONLY: not a real AI test"}**`,
+    `- ANTHROPIC_API_KEY in environment: ${keyPresent ? "yes" : "no"}`,
+    `- AI timeout per turn on calls: ${AI_TIMEOUT_MS} ms (Twilio waits 15 s)`, ``,
+  ];
 
-  out.push(`# RingRiot call check`, ``, `- AI provider: **${provider.name}**${provider.name === "scripted" ? " (no ANTHROPIC_API_KEY in this shell: scripted lines only, NOT a real AI test)" : ""}`,
-    `- Model: ${process.env.ANTHROPIC_MODEL || "claude-haiku-5-5 (default)"}`, `- AI timeout per turn on calls: ${AI_TIMEOUT_MS} ms (Twilio waits 15 s)`, ``);
+  // Preflight: one real request. If the provider rejects it, report the exact (secret-free) error now.
+  if (realAI) {
+    const c = getCharacter("sal")!;
+    const scenario = c.scenarios.find((x) => x.id === "hit-my-car")!;
+    const t0 = Date.now();
+    try {
+      const res = await provider.generate(
+        { character: c, scenario, history: [{ role: "user", text: "Hello? Who is this?" }], channel: "phone", senderName: "Anthony", repliesLeft: 8 },
+        AbortSignal.timeout(AI_TIMEOUT_MS),
+      );
+      console.log(`Preflight OK: ${provider.name} replied in ${Date.now() - t0} ms (${res.inputTokens} in / ${res.outputTokens} out tokens).`);
+    } catch (err) {
+      const e = describeAIError(err, model);
+      const lines = [...header, `## Preflight FAILED`, ``, `- Error: \`${formatAIError(e)}\``, `- Fix: ${e.hint}`, ``,
+        `No scenarios were run: every AI turn would fail the same way and fall back to canned lines.`];
+      writeFileSync("call-check-report.md", lines.join("\n"));
+      console.error(`Preflight FAILED after ${Date.now() - t0} ms: ${formatAIError(e)}\nFix: ${e.hint}`);
+      process.exit(1);
+    }
+  }
+
+  const out: string[] = [];
+  const records: TurnRecord[] = [];
+  const expectationFailures: string[] = [];
+  let maxMs = 0;
 
   for (const pick of picks) {
     const [charId, scenarioId] = pick.split(":");
     const c = getCharacter(charId);
     const s = c?.scenarios.find((x) => x.id === scenarioId);
-    if (!c || !s) { problems.push(`${pick}: unknown scenario`); continue; }
+    if (!c || !s) { expectationFailures.push(`${pick}: unknown scenario`); continue; }
     out.push(`## ${s.title} — ${c.name} (${c.tier})`, ``);
 
     for (const who of RECIPIENTS) {
@@ -80,39 +109,33 @@ async function main() {
         last = await nextTurn(r, line, (input, signal) => provider.generate(input, signal));
         const ms = Date.now() - t0;
         maxMs = Math.max(maxMs, ms);
-        turnsRun++;
-        out.push(`> **Friend:** ${line || "_(silence)_"}`, `> **${c.name}:** ${last.reply}  _(${ms} ms${last.hangup ? `, hung up: ${last.reason}` : ""})_`);
-        if (words(last.reply) > 45) problems.push(`${label}: long reply (${words(last.reply)} words) — slow on the phone`);
-        if (ms > 6000) problems.push(`${label}: slow turn ${ms} ms (Twilio limit 15 s incl. speech + voice)`);
-        if (/<end>/i.test(last.reply)) problems.push(`${label}: end marker would be spoken`);
-        if (/breaking up/.test(last.reply) && provider.name !== "scripted") problems.push(`${label}: AI call failed or timed out (fallback line used)`);
-        if (FLAG_WORDS.test(last.reply)) problems.push(`${label}: review wording — "${last.reply.match(FLAG_WORDS)![0]}" in: ${last.reply}`);
-        const intent = detectIntent(line);
-        if (intent === "ai_question" && !admitsAI(last.reply)) problems.push(`${label}: didn't admit being an AI when asked: ${last.reply}`);
-        if (intent === "leaving" && (!last.hangup || words(last.reply) > 22)) problems.push(`${label}: goodbye wasn't one short line + hang-up: ${last.reply}`);
-        if (intent === "stop" && last.reason !== "asked_to_stop") problems.push(`${label}: "stop" didn't end the call immediately`);
-        if ((intent === "question" || intent === "statement") && provider.name !== "scripted") {
-          last.usage === null && problems.push(`${label}: no AI reply for "${line}" (fallback used)`);
-        }
+        records.push({ label, line, outcome: last, ms });
+        const err = last.aiError ? `: ${formatAIError(last.aiError)}` : "";
+        out.push(`> **Friend:** ${line || "_(silence)_"}`, `> **${c.name}:** ${last.reply}  _([${TAG[last.source]}${err}] ${ms} ms${last.hangup ? `, hung up: ${last.reason}` : ""})_`);
         if (last.hangup) break;
         r = { ...r, transcript: last.transcript, turns: last.turns };
       }
       const verdict = last ? who.expect(last) : "no turns ran";
-      if (verdict) problems.push(`${label}: ${verdict}`);
+      if (verdict) expectationFailures.push(`${label}: ${verdict}`);
       out.push(``, verdict ? `**Check: ✗ ${verdict}**` : `Check: ✓ ended as expected (${last!.reason})`, ``);
     }
   }
 
+  const result = evaluateRun({ providerName: provider.name, keyPresent, turns: records, expectationFailures });
+  const c = result.counts;
   const summary = [
-    `## Summary`, ``,
-    `- Scenarios: ${picks.length} · simulated calls: ${picks.length * RECIPIENTS.length} · AI turns: ${turnsRun} · slowest turn: ${maxMs} ms`,
-    problems.length ? `- **${problems.length} item(s) to review:**\n${problems.map((p) => `  - ${p}`).join("\n")}` : `- No automatic problems found. Still read the transcripts: naturalness and humor need a human.`,
+    `## Summary: ${result.exitCode === 0 ? "PASS" : "FAIL"} (${result.mode})`, ``,
+    `- Scenarios: ${picks.length} · simulated calls: ${picks.length * RECIPIENTS.length} · turns: ${records.length} · slowest: ${maxMs} ms`,
+    `- Replies: **${c.ai} genuine AI** · ${c.fallback} AI-failed fallbacks · ${c.scripted} scripted · ${c.safeguard} safeguard (stop/silence, no AI call)`,
+    result.failures.length ? `- **${result.failures.length} failure(s):**\n${result.failures.map((p) => `  - ${p}`).join("\n")}` : `- No failures.`,
+    result.warnings.length ? `- ${result.warnings.length} warning(s) to review:\n${result.warnings.map((p) => `  - ${p}`).join("\n")}` : `- No warnings.`,
+    result.mode === "scripted" ? `- NOTE: scripted lines only. This is NOT a real AI test.` : `- Still read the transcripts: naturalness and humor need a human.`,
     ``,
   ];
-  writeFileSync("call-check-report.md", [...out.slice(0, 5), ...summary, ...out.slice(5)].join("\n"));
+  writeFileSync("call-check-report.md", [...header, ...summary, ...out].join("\n"));
   console.log(summary.join("\n"));
   console.log(`Full transcripts: call-check-report.md`);
-  if (provider.name === "scripted") console.log("NOTE: provider is scripted — set ANTHROPIC_API_KEY in this shell to test the real AI.");
+  process.exit(result.exitCode);
 }
 
-main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
+main().catch((e) => { console.error(e instanceof Error ? redactSecrets(e.message) : e); process.exit(1); });

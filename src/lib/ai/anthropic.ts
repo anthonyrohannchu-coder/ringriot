@@ -7,8 +7,13 @@ const outCost = Number(process.env.AI_COST_PER_MTOK_OUTPUT || 5);
 
 export class AnthropicProvider implements ConversationProvider {
   name = "anthropic";
-  private client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  private client: Anthropic;
   private model = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
+
+  /** `options` lets tests point the real SDK at a fake API (e.g. a custom fetch); production passes nothing. */
+  constructor(options: ConstructorParameters<typeof Anthropic>[0] = {}) {
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, ...options });
+  }
 
   async generate(input: GenerateInput, signal?: AbortSignal): Promise<GenerateResult> {
     // The opener is the character's first message; the API needs a user turn first.

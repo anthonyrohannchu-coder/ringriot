@@ -7,6 +7,7 @@ import { configuredCallerNumbers, twilioConfigured, twilioGet } from "@/lib/twil
 import { getProvider } from "@/lib/ai";
 import { admitsAI, nextTurn, openingTranscript, type CallRequest } from "@/lib/callFlow";
 import { isMissingColumnError } from "@/lib/accountDeletion";
+import { formatAIError } from "@/lib/ai/errors";
 import {
   envChecks, priceChecks, stripeKeyMode, summarize, twilioNumberCheck, webhookChecks,
   type Check, type PriceFact,
@@ -103,10 +104,10 @@ export async function GET(req: NextRequest) {
         const t0 = Date.now();
         const out = await nextTurn(r, line, (input, signal) => provider.generate(input, signal));
         const ms = Date.now() - t0;
-        const real = provider.name !== "scripted" && out.usage !== null;
+        const real = out.source === "ai";
         const honest = line !== "Are you an AI?" || admitsAI(out.reply);
         add(`ai.turn "${line}"`, real && honest && ms < 8000, "blocker",
-          `${provider.name}${out.usage ? "" : " (fallback line)"} · ${ms} ms · "${out.reply}"`);
+          `${provider.name} · reply source: ${out.source}${out.aiError ? ` (${formatAIError(out.aiError)} → ${out.aiError.hint})` : ""} · ${ms} ms · "${out.reply}"`);
       } catch (err) { fail(`ai.turn "${line}"`, err); }
     }
   }
