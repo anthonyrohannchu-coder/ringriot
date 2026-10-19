@@ -46,8 +46,8 @@ export default async function LegalPage({ params }: { params: Promise<{ page: st
   return (
     <section className="px-4 py-12">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-4xl font-extrabold tracking-tight">{p.title}</h1>
-        <ul className="mt-6 space-y-4 text-muted">
+        <h1 className="text-4xl">{p.title}</h1>
+        <ul className="mt-6 space-y-4 text-ink/70">
           {p.body.map((b) => <li key={b} className="leading-relaxed">{b}</li>)}
         </ul>
       </div>

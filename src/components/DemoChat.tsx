@@ -3,12 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { PublicCharacter } from "@/lib/characters";
+import { CharacterFace } from "./CharacterFace";
 import { Waveform } from "./Waveform";
 
 type Turn = { role: "user" | "character"; text: string };
 type Mode = "demo" | "paid";
 
-// ---------- Voice helpers (free, on-device) ----------
+const DECLINE_LINES = [
+  "Declined?! Oh, she's calling back.",
+  "You declined AGAIN. She has your number memorized now.",
+  "Third time. Honestly? Just pick up.",
+];
+
 function pickVoice(prefer?: "male" | "female") {
   const voices = typeof window !== "undefined" ? window.speechSynthesis?.getVoices() ?? [] : [];
   const en = voices.filter((v) => v.lang.startsWith("en"));
@@ -17,6 +23,8 @@ function pickVoice(prefer?: "male" | "female") {
   const hint = prefer === "female" ? femaleHints : prefer === "male" ? maleHints : null;
   return (hint && en.find((v) => hint.test(v.name))) || en[0] || voices[0];
 }
+
+const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
 export function DemoChat({
   characters,
@@ -36,6 +44,9 @@ export function DemoChat({
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [started, setStarted] = useState(false);
+  const [declines, setDeclines] = useState(0);
+  const [declinedFlash, setDeclinedFlash] = useState(false);
+  const [seconds, setSeconds] = useState(0);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -47,16 +58,22 @@ export function DemoChat({
   const [muted, setMuted] = useState(false);
   const [clip, setClip] = useState<{ hook: string; caption: string } | null>(null);
   const requestId = useRef<string>("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
-  // Scroll only inside the chat box, and only once a conversation has started (never jump the page on load).
   useEffect(() => {
-    const box = endRef.current?.parentElement;
+    const box = logRef.current;
     if (box && turns.length > 0) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
-  }, [turns, busy]);
+  }, [turns, busy, error, clip]);
+
   useEffect(() => {
-    window.speechSynthesis?.getVoices(); // warm up voice list
+    window.speechSynthesis?.getVoices();
   }, []);
+
+  useEffect(() => {
+    if (!started) return;
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [started]);
 
   function reset(nextChar = charId) {
     window.speechSynthesis?.cancel();
@@ -65,6 +82,8 @@ export function DemoChat({
     setScenarioId(c.scenarios[0].id);
     setTurns([]);
     setStarted(false);
+    setDeclines(0);
+    setSeconds(0);
     setError(null);
     setSessionId(null);
     setClip(null);
@@ -101,12 +120,20 @@ export function DemoChat({
     }
   }
 
-  function start() {
+  function accept() {
     setStarted(true);
+    setSeconds(0);
     requestId.current = crypto.randomUUID();
-    const first: Turn = { role: "character", text: scenario.opener };
-    setTurns([first]);
-    speak(first.text);
+    const opener =
+      declines > 0 ? `Oh, NOW you pick up. ${scenario.opener}` : scenario.opener;
+    setTurns([{ role: "character", text: opener }]);
+    speak(opener);
+  }
+
+  function decline() {
+    setDeclinedFlash(true);
+    setDeclines((d) => d + 1);
+    setTimeout(() => setDeclinedFlash(false), 1600);
   }
 
   async function send(text: string) {
@@ -114,7 +141,6 @@ export function DemoChat({
     if (!clean || busy) return;
     setError(null);
     setInput("");
-    // History sent to the server excludes the opener (server re-adds it).
     const history = [...turns.slice(1), { role: "user" as const, text: clean }];
     setTurns((t) => [...t, { role: "user", text: clean }]);
     setBusy(true);
@@ -132,10 +158,9 @@ export function DemoChat({
       const data = await res.json();
       if (!res.ok) {
         setError({
-          message: data.message ?? "Something went wrong. Try again.",
-          upgrade: ["demo_limit", "upgrade_required", "no_credits", "daily_cap"].includes(data.error),
+          message: data.error === "unauthorized" ? "Log in to keep going." : data.message ?? "Something went wrong. Try again.",
+          upgrade: ["demo_limit", "upgrade_required", "no_credits", "daily_cap", "unauthorized"].includes(data.error),
         });
-        if (data.error === "unauthorized") setError({ message: "Log in to continue.", upgrade: true });
         return;
       }
       setProvider(data.provider);
@@ -154,7 +179,7 @@ export function DemoChat({
     type SR = { lang: string; interimResults: boolean; onresult: (e: { results: { 0: { 0: { transcript: string } } } }) => void; onend: () => void; onerror: () => void; start: () => void };
     const W = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR };
     const Ctor = W.SpeechRecognition ?? W.webkitSpeechRecognition;
-    if (!Ctor) return setError({ message: "Voice input isn't supported in this browser. Type instead." });
+    if (!Ctor) return setError({ message: "Voice input doesn't work in this browser. Type instead." });
     window.speechSynthesis?.cancel();
     const rec = new Ctor();
     rec.lang = "en-US";
@@ -170,152 +195,193 @@ export function DemoChat({
     const lines = turns.filter((t) => t.role === "character");
     const best = [...lines].sort((a, b) => b.text.length - a.text.length)[0]?.text ?? scenario.opener;
     setClip({
-      hook: `POV: you let an AI ${character.archetype.replace(/^The /, "").toLowerCase()} talk to you`,
-      caption: `"${best}" 💀 ${character.name} is unhinged. Made with AI characters (simulation). #ai #funny #comedy #prank`,
+      hook: `POV: you picked up a call from ${character.archetype.replace(/^The /, "the ").toLowerCase()}`,
+      caption: `"${best}" 💀 ${character.name} has zero chill. (AI character, fake call) #funny #comedy #ai #prank`,
     });
   }
 
   const accent = character.accent;
   const locked = (c: PublicCharacter) => mode === "demo" && c.tier !== "free";
+  const first = character.name.split(" ")[0].replace(".", "");
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
-      {/* Picker */}
-      <div className="space-y-4">
-        <div className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:grid-cols-2 lg:overflow-visible">
-          {characters.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => !locked(c) && reset(c.id)}
-              className={`relative min-w-[132px] rounded-2xl border p-3 text-left transition active:scale-[.97] ${
-                c.id === charId ? "border-white/70 bg-panel" : "border-line bg-panel/50 hover:border-white/30"
-              } ${locked(c) ? "opacity-50" : ""}`}
-              style={c.id === charId ? { boxShadow: `0 0 0 1px ${c.accent}55, 0 8px 30px -10px ${c.accent}88` } : undefined}
-              aria-pressed={c.id === charId}
-            >
-              <div className="text-2xl">{c.emoji}</div>
-              <div className="mt-1 text-sm font-bold leading-tight">{c.name}</div>
-              <div className="text-[11px] leading-tight text-muted">{c.archetype.replace("The ", "")}</div>
-              {locked(c) && <span className="label absolute right-2 top-2 text-[9px] text-volt">{c.tier}</span>}
-            </button>
-          ))}
+    <div className="grid items-start gap-6 lg:grid-cols-[1fr_420px]">
+      {/* Character picker */}
+      <div className="order-2 space-y-5 lg:order-1">
+        <div>
+          <p className="label mb-3">1 · Pick who calls</p>
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-3 sm:grid sm:grid-cols-4 sm:overflow-visible">
+            {characters.map((c) => {
+              const active = c.id === charId;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => !locked(c) && reset(c.id)}
+                  aria-pressed={active}
+                  className={`sticker-sm relative min-w-[118px] rounded-2xl p-3 text-left transition ${active ? "-rotate-2 scale-[1.03]" : "press"} ${locked(c) ? "cursor-not-allowed opacity-60" : ""}`}
+                  style={{ background: active ? c.accent : "#fff" }}
+                >
+                  <CharacterFace id={c.id} color={c.accent} size={48} />
+                  <div className="mt-1 text-sm font-extrabold leading-tight">{c.name}</div>
+                  <div className="text-[11px] font-medium leading-tight text-ink/70">{c.archetype.replace("The ", "")}</div>
+                  {locked(c) && (
+                    <span className="sticker-sm absolute -right-2 -top-2 rotate-6 rounded-full bg-volt px-2 py-0.5 text-[10px] font-extrabold uppercase">
+                      🔒 {c.tier}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div>
-          <p className="label mb-2 text-muted">Scenario</p>
-          <div className="space-y-2">
+          <p className="label mb-3">2 · Pick the situation</p>
+          <div className="flex flex-wrap gap-2">
             {character.scenarios.map((s) => (
               <button
                 key={s.id}
-                onClick={() => { setScenarioId(s.id); setTurns([]); setStarted(false); setSessionId(null); }}
-                className={`w-full rounded-xl border px-3 py-2.5 text-left text-sm ${s.id === scenario.id ? "border-white/60 bg-panel" : "border-line text-muted"}`}
+                onClick={() => { setScenarioId(s.id); setTurns([]); setStarted(false); setSessionId(null); setDeclines(0); }}
+                className={`sticker-sm rounded-full px-4 py-2 text-sm font-bold ${s.id === scenario.id ? "bg-ink text-paper" : "press bg-panel"}`}
               >
                 {s.title}
               </button>
             ))}
           </div>
         </div>
+        <div className="sticker tilt-l hidden rounded-2xl bg-panel p-4 lg:block">
+          <p className="label text-hot">Sample line</p>
+          <p className="mt-1 text-lg font-bold">&ldquo;{character.exampleLine}&rdquo;</p>
+          <p className="mt-1 text-sm text-muted">— {character.name}</p>
+        </div>
       </div>
 
-      {/* Call screen */}
-      <div className="flex min-h-[520px] flex-col overflow-hidden rounded-3xl border border-line bg-panel">
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-full text-2xl" style={{ background: `${accent}22`, boxShadow: `0 0 24px -4px ${accent}` }}>
-              {character.emoji}
-            </div>
-            <div>
-              <div className="font-bold">{character.name}</div>
-              <div className="flex items-center gap-2 text-xs text-muted">
-                <Waveform active={speaking || busy} color={accent} />
-                {busy ? "thinking…" : speaking ? "talking" : started ? "on the line" : "ready"}
-              </div>
-            </div>
-          </div>
-          <button onClick={() => { setMuted((m) => !m); window.speechSynthesis?.cancel(); }} className="rounded-full border border-line px-3 py-1.5 text-xs" aria-label={muted ? "Unmute" : "Mute"}>
-            {muted ? "🔇 Muted" : "🔊 Sound on"}
-          </button>
-        </div>
+      {/* Phone */}
+      <div className="order-1 mx-auto w-full max-w-[400px] lg:order-2">
+        <div className="sticker rounded-[46px] bg-ink p-2.5">
+          <div className="relative flex h-[600px] flex-col overflow-hidden rounded-[38px] bg-paper">
+            <div className="absolute left-1/2 top-2 z-10 h-6 w-24 -translate-x-1/2 rounded-full bg-ink" aria-hidden />
 
-        <div className="label border-b border-line bg-ink/60 px-4 py-2 text-[10px] text-ice">
-          ◉ Browser simulation · not a real phone call
-          {provider === "scripted" && <span className="ml-2 text-muted">· scripted lines (AI key not set)</span>}
-        </div>
-
-        <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
-          {!started && (
-            <div className="grid h-full place-items-center text-center">
-              <div>
-                <p className="text-muted">{character.description}</p>
-                <p className="mt-3 italic text-white/80">&ldquo;{character.exampleLine}&rdquo;</p>
-                <button onClick={start} className="mt-6 rounded-full px-7 py-3.5 text-base font-bold text-ink active:scale-95" style={{ background: accent }}>
-                  ▶ Start the bit
-                </button>
-                {mode === "paid" && <p className="mt-2 text-xs text-muted">Uses 1 credit when you send your first reply</p>}
-              </div>
-            </div>
-          )}
-          {turns.map((t, i) => (
-            <div key={i} className={`rise flex ${t.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${t.role === "user" ? "rounded-br-sm bg-white text-ink" : "rounded-bl-sm bg-ink"}`}
-                style={t.role === "character" ? { border: `1px solid ${accent}44` } : undefined}
-              >
-                {t.text}
-                {t.role === "character" && (
-                  <button onClick={() => speak(t.text)} className="ml-2 align-middle text-xs text-muted hover:text-white" aria-label="Replay line">↻</button>
-                )}
-              </div>
-            </div>
-          ))}
-          {busy && <div className="rise text-sm text-muted">{character.name.split(" ")[0]} is typing…</div>}
-          {error && (
-            <div className="rise rounded-xl border border-hot/40 bg-hot/10 p-3 text-sm">
-              {error.message}
-              {error.upgrade && (
-                <div className="mt-2 flex gap-2">
-                  <Link href="/pricing" className="rounded-full bg-volt px-3 py-1.5 text-xs font-bold text-ink">See plans</Link>
-                  {mode === "demo" && <Link href="/login" className="rounded-full border border-line px-3 py-1.5 text-xs">Sign up</Link>}
+            {!started ? (
+              /* Incoming call screen */
+              <div className="flex h-full flex-col items-center justify-between px-6 pb-10 pt-14 text-center" style={{ background: `linear-gradient(180deg, ${accent} 0%, #fff8e1 85%)` }}>
+                <div>
+                  <p className="label">{declines ? "calling again…" : "incoming call…"}</p>
+                  <div className="ring mx-auto mt-6 w-fit">
+                    <CharacterFace id={character.id} color={accent} size={150} />
+                  </div>
+                  <h3 className="mt-4 text-3xl leading-none">{character.name}</h3>
+                  <p className="mt-2 font-semibold text-ink/70">{scenario.title}</p>
+                  <p className="sticker-sm mx-auto mt-4 w-fit rounded-full bg-panel px-3 py-1 text-[11px] font-bold">◉ Browser simulation · not a real call</p>
+                  {declinedFlash && <p className="rise mt-4 font-extrabold">{DECLINE_LINES[Math.min(declines - 1, 2)]}</p>}
                 </div>
-              )}
-            </div>
-          )}
-          {clip && (
-            <div className="rise rounded-xl border border-volt/40 bg-volt/5 p-3 text-sm">
-              <p className="label mb-1 text-volt">Clip kit</p>
-              <p><b>Hook:</b> {clip.hook}</p>
-              <p className="mt-1"><b>Caption:</b> {clip.caption}</p>
-              <button onClick={() => navigator.clipboard?.writeText(`${clip.hook}\n\n${clip.caption}`)} className="mt-2 rounded-full border border-line px-3 py-1 text-xs">Copy</button>
-            </div>
-          )}
-          <div ref={endRef} />
-        </div>
+                <div className="flex w-full items-end justify-around">
+                  <div className="flex flex-col items-center gap-2">
+                    <button onClick={decline} aria-label="Decline" className="sticker press grid h-[72px] w-[72px] place-items-center rounded-full bg-nope text-3xl text-white">
+                      <span className="rotate-[135deg]">☎</span>
+                    </button>
+                    <span className="text-sm font-bold">Decline</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <button onClick={accept} aria-label="Accept" className="sticker press pulse-ring grid h-[72px] w-[72px] place-items-center rounded-full bg-go text-3xl text-white">
+                      ☎
+                    </button>
+                    <span className="text-sm font-bold">Accept</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* In-call screen */
+              <>
+                <div className="flex items-center justify-between gap-2 border-b-[3px] border-ink px-4 pb-3 pt-10" style={{ background: accent }}>
+                  <div className="flex items-center gap-2.5">
+                    <CharacterFace id={character.id} color={accent} size={46} talking={speaking} />
+                    <div>
+                      <div className="font-extrabold leading-tight">{character.name}</div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <Waveform active={speaking || busy} color="#17121a" />
+                        {busy ? "thinking…" : speaking ? "talking" : fmt(seconds)}
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => { setMuted((m) => !m); window.speechSynthesis?.cancel(); }} className="sticker-sm rounded-full bg-panel px-3 py-1 text-xs font-bold" aria-label={muted ? "Unmute" : "Mute"}>
+                    {muted ? "🔇" : "🔊"}
+                  </button>
+                </div>
+                <div className="border-b-2 border-ink/15 bg-panel px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-ink/60">
+                  ◉ Simulation · not a real phone call
+                  {provider === "scripted" && <span> · scripted lines</span>}
+                </div>
 
-        {started && (
-          <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="flex items-center gap-2 border-t border-line p-3">
-            <button type="button" onClick={listen} disabled={busy} className={`grid h-12 w-12 shrink-0 place-items-center rounded-full border ${listening ? "border-hot bg-hot/20" : "border-line"}`} aria-label="Talk">
-              🎙
-            </button>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={listening ? "Listening…" : "Say something back…"}
-              maxLength={500}
-              className="h-12 flex-1 rounded-full border border-line bg-ink px-4 text-[15px] outline-none focus:border-white/50"
-            />
-            <button disabled={busy || !input.trim()} className="h-12 rounded-full px-5 font-bold text-ink disabled:opacity-40" style={{ background: accent }}>
-              Send
-            </button>
-          </form>
-        )}
-        {started && (
-          <div className="flex items-center justify-between px-4 pb-3 text-xs text-muted">
-            <span>{remaining !== null ? `${remaining} free replies left today` : " "}</span>
-            <div className="flex gap-3">
-              {turns.length > 2 && <button onClick={makeClip} className="hover:text-white">✂ Make clip kit</button>}
-              <button onClick={() => reset()} className="hover:text-white">End call</button>
-            </div>
+                <div ref={logRef} className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+                  {turns.map((t, i) => (
+                    <div key={i} className={`rise flex ${t.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`sticker-sm max-w-[85%] px-3.5 py-2 text-[15px] font-medium leading-snug ${t.role === "user" ? "rounded-2xl rounded-br-md bg-ice text-white" : "rounded-2xl rounded-bl-md bg-panel"}`}
+                      >
+                        {t.text}
+                        {t.role === "character" && (
+                          <button onClick={() => speak(t.text)} className="ml-1.5 align-middle text-xs text-ink/50 hover:text-ink" aria-label="Replay line">↻</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {busy && <div className="rise text-sm font-bold text-ink/60">{first} is typing…</div>}
+                  {error && (
+                    <div className="rise sticker-sm rounded-2xl bg-volt p-3 text-sm font-semibold">
+                      {error.message}
+                      {error.upgrade && (
+                        <div className="mt-2 flex gap-2">
+                          <Link href="/pricing" className="sticker-sm rounded-full bg-hot px-3 py-1 text-xs font-extrabold">See plans</Link>
+                          {mode === "demo" && <Link href="/login" className="sticker-sm rounded-full bg-panel px-3 py-1 text-xs font-extrabold">Sign up</Link>}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {clip && (
+                    <div className="rise sticker-sm rounded-2xl bg-hot p-3 text-sm">
+                      <p className="label">✂ Clip kit</p>
+                      <p className="mt-1"><b>Hook:</b> {clip.hook}</p>
+                      <p className="mt-1"><b>Caption:</b> {clip.caption}</p>
+                      <button
+                        onClick={(e) => {
+                          const btn = e.currentTarget;
+                          navigator.clipboard?.writeText(`${clip.hook}\n\n${clip.caption}`).then(() => (btn.textContent = "Copied!"), () => (btn.textContent = "Select & copy above"));
+                        }}
+                        className="sticker-sm mt-2 rounded-full bg-panel px-3 py-1 text-xs font-extrabold"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="flex items-center gap-2 border-t-[3px] border-ink bg-panel p-2.5">
+                  <button type="button" onClick={listen} disabled={busy} className={`sticker-sm grid h-11 w-11 shrink-0 place-items-center rounded-full ${listening ? "bg-hot" : "bg-paper"}`} aria-label="Talk with your mic">
+                    🎙
+                  </button>
+                  <input
+                    id="demo-input"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={listening ? "Listening…" : `Say something to ${first}…`}
+                    maxLength={500}
+                    className="h-11 min-w-0 flex-1 rounded-full border-[2.5px] border-ink bg-paper px-4 text-[15px] font-medium outline-none focus:bg-white"
+                  />
+                  <button disabled={busy || !input.trim()} className="sticker-sm h-11 rounded-full bg-volt px-4 font-extrabold disabled:opacity-40">
+                    Send
+                  </button>
+                </form>
+                <div className="flex items-center justify-between bg-panel px-4 pb-3 text-xs font-bold">
+                  <span className="text-ink/60">{remaining !== null ? `${remaining} free replies left today` : mode === "paid" ? "1 credit per call" : " "}</span>
+                  <div className="flex gap-3">
+                    {turns.length > 2 && <button onClick={makeClip} className="underline decoration-2 underline-offset-2">✂ Clip it</button>}
+                    <button onClick={() => reset()} className="text-nope underline decoration-2 underline-offset-2">Hang up</button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

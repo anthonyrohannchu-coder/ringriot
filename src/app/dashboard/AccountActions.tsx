@@ -17,11 +17,11 @@ export function BillingButton() {
           if (data.url) window.location.href = data.url;
           else { setErr("Couldn't open billing."); setBusy(false); }
         }}
-        className="w-full rounded-full border border-line py-3 font-semibold disabled:opacity-60"
+        className="w-full sticker-sm press rounded-full bg-panel py-3 font-semibold disabled:opacity-60"
       >
         {busy ? "Opening…" : "Manage billing"}
       </button>
-      {err && <p className="mt-1 text-xs text-hot">{err}</p>}
+      {err && <p className="mt-1 text-xs text-nope">{err}</p>}
     </div>
   );
 }
@@ -29,7 +29,7 @@ export function BillingButton() {
 export function SignOut() {
   const router = useRouter();
   return (
-    <button onClick={async () => { await supabaseBrowser().auth.signOut(); router.push("/"); router.refresh(); }} className="text-sm text-muted hover:text-white">
+    <button onClick={async () => { await supabaseBrowser().auth.signOut(); router.push("/"); router.refresh(); }} className="text-sm text-ink/70 hover:text-ink">
       Sign out
     </button>
   );
@@ -38,7 +38,7 @@ export function SignOut() {
 export function DeleteSession({ id }: { id: string }) {
   const router = useRouter();
   return (
-    <button aria-label="Delete conversation" className="hover:text-hot" onClick={async () => {
+    <button aria-label="Delete conversation" className="hover:text-nope" onClick={async () => {
       if (!confirm("Delete this conversation and its transcript?")) return;
       await fetch(`/api/sessions/${id}`, { method: "DELETE" });
       router.refresh();
@@ -59,15 +59,15 @@ export function PrivacySettings({ save, days }: { save: boolean; days: number })
     <div className="mt-3 space-y-3 text-sm">
       <label className="flex items-center justify-between gap-3">
         Save transcripts
-        <input type="checkbox" checked={s} onChange={(e) => { setS(e.target.checked); update({ save_transcripts: e.target.checked }); }} className="h-5 w-5 accent-[#d4ff3d]" />
+        <input type="checkbox" checked={s} onChange={(e) => { setS(e.target.checked); update({ save_transcripts: e.target.checked }); }} className="h-5 w-5 accent-[#ff4fa3]" />
       </label>
       <label className="flex items-center justify-between gap-3">
         Auto-delete after
-        <select value={d} onChange={(e) => { const v = Number(e.target.value); setD(v); update({ transcript_retention_days: v }); }} className="rounded-lg border border-line bg-ink px-2 py-1">
+        <select value={d} onChange={(e) => { const v = Number(e.target.value); setD(v); update({ transcript_retention_days: v }); }} className="rounded-lg border-[2.5px] border-ink bg-paper px-2 py-1">
           {[7, 30, 90].map((n) => <option key={n} value={n}>{n} days</option>)}
         </select>
       </label>
-      {saved && <p className="text-xs text-volt">Saved</p>}
+      {saved && <p className="text-xs font-bold text-go">Saved</p>}
     </div>
   );
 }
@@ -84,7 +84,7 @@ export function DeleteAccount() {
         if (r.ok) { await supabaseBrowser().auth.signOut(); window.location.href = "/"; }
         else { alert("Couldn't delete the account. Email support."); setBusy(false); }
       }}
-      className="mt-3 rounded-full border border-hot/50 px-5 py-2.5 text-sm font-semibold text-hot disabled:opacity-60"
+      className="mt-3 rounded-full border border-nope px-5 py-2.5 text-sm font-semibold text-nope disabled:opacity-60"
     >
       {busy ? "Deleting…" : "Delete my account"}
     </button>

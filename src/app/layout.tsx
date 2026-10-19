@@ -1,27 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
+import { Bowlby_One, Rubik } from "next/font/google";
 import "./globals.css";
 import { brand } from "@/config/brand";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-jb", display: "swap" });
+const display = Bowlby_One({ subsets: ["latin"], weight: "400", variable: "--font-bowlby", display: "swap" });
+const body = Rubik({ subsets: ["latin"], variable: "--font-rubik", display: "swap" });
 
 export const metadata: Metadata = {
-  title: `${brand.name} — AI prank characters`,
-  description: "Pick an unhinged AI character, hear them in your browser, and turn it into a clip.",
+  title: `${brand.name} — AI characters with zero chill`,
+  description: "Pick an unhinged AI character, hit call, and talk back. They never break character.",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg" },
-  appleWebApp: { capable: true, title: brand.name, statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: brand.name, statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { themeColor: "#08080c", width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#ffd60a", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable}`}>
-      <body className="grain antialiased">
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body className="antialiased">
         <Nav />
         <main className="pb-24 md:pb-0">{children}</main>
         <Footer />

@@ -36,28 +36,28 @@ export default function LoginPage() {
 
   return (
     <section className="grid min-h-[70dvh] place-items-center px-4">
-      <div className="w-full max-w-sm rounded-3xl border border-line bg-panel p-7">
-        <div className="grid grid-cols-2 rounded-full border border-line p-1 text-sm font-semibold">
+      <div className="w-full max-w-sm sticker rounded-3xl bg-panel p-7">
+        <div className="grid grid-cols-2 sticker-sm rounded-full bg-panel p-1 text-sm font-semibold">
           {(["signup", "login"] as const).map((m) => (
             <button key={m} type="button" onClick={() => { setMode(m); setErr(""); }}
-              className={`rounded-full py-2 ${mode === m ? "bg-volt text-ink" : "text-muted"}`}>
+              className={`rounded-full py-2 ${mode === m ? "bg-volt text-ink" : "text-ink/70"}`}>
               {m === "signup" ? "Sign up" : "Log in"}
             </button>
           ))}
         </div>
-        <h1 className="mt-6 text-3xl font-extrabold tracking-tight">{mode === "signup" ? "Create your account" : "Welcome back"}</h1>
+        <h1 className="mt-6 text-3xl">{mode === "signup" ? "Create your account" : "Welcome back"}</h1>
         <form onSubmit={submit} className="mt-6 space-y-3">
           <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" autoComplete="email"
-            className="h-12 w-full rounded-full border border-line bg-ink px-4 outline-none focus:border-white/50" />
+            className="h-12 w-full rounded-full border-[2.5px] border-ink bg-paper px-4 outline-none focus:bg-white" />
           <input id="password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
             placeholder={mode === "signup" ? "Password (8+ characters)" : "Password"} autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            className="h-12 w-full rounded-full border border-line bg-ink px-4 outline-none focus:border-white/50" />
-          <button disabled={busy} className="h-12 w-full rounded-full bg-volt font-bold text-ink disabled:opacity-60">
+            className="h-12 w-full rounded-full border-[2.5px] border-ink bg-paper px-4 outline-none focus:bg-white" />
+          <button disabled={busy} className="h-12 w-full rounded-full sticker-sm press bg-volt font-bold text-ink disabled:opacity-60">
             {busy ? "One sec…" : mode === "signup" ? "Create account" : "Log in"}
           </button>
-          {err && <p className="text-sm text-hot">{err}</p>}
+          {err && <p className="text-sm text-nope">{err}</p>}
         </form>
-        <p className="mt-5 text-xs text-muted">By continuing you agree to the Terms and Acceptable Use policy.</p>
+        <p className="mt-5 text-xs text-ink/70">By continuing you agree to the Terms and Acceptable Use policy.</p>
       </div>
     </section>
   );

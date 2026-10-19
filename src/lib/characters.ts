@@ -36,7 +36,7 @@ export const characters: Character[] = [
     name: "Delores Vane",
     archetype: "The Overly Dramatic Customer",
     emoji: "🎭",
-    accent: "#ff3df2",
+    accent: "#ff7ab8",
     tier: "free",
     description: "Treats every minor inconvenience like the season finale of a soap opera.",
     personality:
@@ -71,7 +71,7 @@ export const characters: Character[] = [
     name: "Pip Halloway",
     archetype: "The Confused Tourist",
     emoji: "🧳",
-    accent: "#3dfcff",
+    accent: "#5fd4ff",
     tier: "free",
     description: "Completely lost, absolutely convinced you are the hotel concierge.",
     personality:
@@ -106,7 +106,7 @@ export const characters: Character[] = [
     name: "Det. Rex Granite",
     archetype: "The Ridiculously Serious Detective",
     emoji: "🕵️",
-    accent: "#ffd23d",
+    accent: "#ffb84d",
     tier: "free",
     description: "Investigates the theft of an office stapler like it's a triple homicide.",
     personality:
@@ -141,7 +141,7 @@ export const characters: Character[] = [
     name: "Brenda Nowak",
     archetype: "The Awkward Interviewer",
     emoji: "📋",
-    accent: "#7cff6b",
+    accent: "#8ee35a",
     tier: "plus",
     description: "Runs the most uncomfortable job interview of your life, for a job that may not exist.",
     personality:
@@ -170,7 +170,7 @@ export const characters: Character[] = [
     name: "Chip Sparkle",
     archetype: "The Overexcited Game Show Host",
     emoji: "🎤",
-    accent: "#ff7a3d",
+    accent: "#ff8a3d",
     tier: "plus",
     description: "Congratulations! You've won! Probably gravel. A LOT of gravel.",
     personality:
@@ -205,7 +205,7 @@ export const characters: Character[] = [
     name: "Marcus Bellweather",
     archetype: "The Absurd Negotiator",
     emoji: "🤝",
-    accent: "#a06bff",
+    accent: "#b48cff",
     tier: "plus",
     description: "A ruthless dealmaker desperate to buy your single left sock.",
     personality:
@@ -234,7 +234,7 @@ export const characters: Character[] = [
     name: "Kenny Clutch",
     archetype: "The Unreasonably Competitive Gamer",
     emoji: "🎮",
-    accent: "#3dff9e",
+    accent: "#3ddc97",
     tier: "pro",
     description: "Turns ordering a coffee into a ranked match. He is losing. Loudly.",
     personality:
@@ -263,7 +263,7 @@ export const characters: Character[] = [
     name: "Sir Reginald Ashcombe",
     archetype: "The Extremely Formal Person",
     emoji: "🎩",
-    accent: "#ffffff",
+    accent: "#c7b8ff",
     tier: "pro",
     description: "RSVPs to your backyard barbecue like it's a royal coronation.",
     personality:

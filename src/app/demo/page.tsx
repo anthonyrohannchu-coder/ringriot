@@ -17,8 +17,8 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   return (
     <section className="px-4 py-8">
       <div className="mx-auto max-w-6xl">
-        <h1 className="mb-1 text-3xl font-extrabold tracking-tight">{paid ? "Studio" : "Free demo"}</h1>
-        <p className="mb-6 text-muted">{paid ? "Each new conversation uses 1 credit." : "Free characters only. Upgrade for the full cast."}</p>
+        <h1 className="mb-1 text-3xl">{paid ? "Studio" : "Free demo"}</h1>
+        <p className="mb-6 text-ink/70">{paid ? "Each new conversation uses 1 credit." : "Free characters only. Upgrade for the full cast."}</p>
         <DemoChat
           characters={characters.map(publicCharacter)}
           mode={paid ? "paid" : "demo"}

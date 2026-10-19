@@ -14,13 +14,19 @@ export function BuyButton({ product, label, primary }: { product: "plus" | "pro"
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ product }),
       });
-      const data = await res.json();
-      if (res.status === 401) return (window.location.href = `/login?next=/pricing`);
-      if (!res.ok || !data.url) return setMsg(data.message ?? (data.error === "stripe_not_configured" ? "Payments aren't switched on yet." : "Couldn't start checkout."));
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        window.location.href = `/login?next=/pricing`;
+        return;
+      }
+      if (!res.ok || !data.url) {
+        setMsg(data.message ?? (data.error === "stripe_not_configured" ? "Payments aren't switched on yet." : "Couldn't open checkout. Try again."));
+        setBusy(false);
+        return;
+      }
       window.location.href = data.url;
     } catch {
       setMsg("Network error. Try again.");
-    } finally {
       setBusy(false);
     }
   }
@@ -30,11 +36,11 @@ export function BuyButton({ product, label, primary }: { product: "plus" | "pro"
       <button
         onClick={go}
         disabled={busy}
-        className={`w-full rounded-full py-3 font-bold transition active:scale-[.98] disabled:opacity-60 ${primary ? "bg-volt text-ink" : "border border-line bg-ink hover:border-white/40"}`}
+        className={`sticker-sm press w-full rounded-full py-3 font-extrabold disabled:opacity-60 ${primary ? "bg-ink text-volt" : "bg-panel"}`}
       >
         {busy ? "Opening checkout…" : label}
       </button>
-      {msg && <p className="mt-2 text-xs text-hot">{msg}</p>}
+      {msg && <p className="mt-2 text-sm font-bold text-nope">{msg}</p>}
     </div>
   );
 }

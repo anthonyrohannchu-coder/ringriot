@@ -30,32 +30,32 @@ export default async function Dashboard() {
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="flex items-end justify-between">
           <div>
-            <p className="label text-muted">Signed in as {user.email}</p>
-            <h1 className="mt-1 text-4xl font-extrabold tracking-tight">Your dashboard</h1>
+            <p className="label text-ink/70">Signed in as {user.email}</p>
+            <h1 className="mt-1 text-4xl">Your dashboard</h1>
           </div>
           <SignOut />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-line bg-panel p-5">
-            <p className="label text-muted">Plan</p>
-            <p className="mt-2 text-3xl font-extrabold">{plan.name}</p>
+          <div className="sticker rounded-3xl bg-panel p-5">
+            <p className="label text-ink/70">Plan</p>
+            <p className="mt-2 display text-3xl">{plan.name}</p>
             {sub && (
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1 text-sm text-ink/70">
                 {sub.status === "past_due" ? "⚠ Payment failed, update your card" : sub.cancel_at_period_end ? "Cancels" : "Renews"}
                 {sub.current_period_end ? ` ${new Date(sub.current_period_end).toLocaleDateString()}` : ""}
               </p>
             )}
           </div>
-          <div className="rounded-3xl border border-volt/40 bg-volt/[.04] p-5">
-            <p className="label text-muted">Credits</p>
-            <p className="mt-2 text-5xl font-extrabold text-volt">{bal?.balance ?? 0}</p>
-            <p className="mt-1 text-sm text-muted">1 credit = 1 conversation</p>
+          <div className="sticker rounded-3xl bg-volt p-5">
+            <p className="label text-ink/70">Credits</p>
+            <p className="mt-2 display text-5xl">{bal?.balance ?? 0}</p>
+            <p className="mt-1 text-sm text-ink/70">1 credit = 1 conversation</p>
           </div>
-          <div className="flex flex-col justify-between gap-3 rounded-3xl border border-line bg-panel p-5">
-            <Link href="/demo" className="rounded-full bg-volt py-3 text-center font-bold text-ink">Start a conversation</Link>
+          <div className="flex flex-col justify-between gap-3 sticker rounded-3xl bg-panel p-5">
+            <Link href="/demo" className="sticker-sm press rounded-full bg-volt py-3 text-center font-bold text-ink">Start a conversation</Link>
             {profile?.plan === "free" ? (
-              <Link href="/pricing" className="rounded-full border border-line py-3 text-center font-semibold">Upgrade</Link>
+              <Link href="/pricing" className="sticker-sm press rounded-full bg-panel py-3 text-center font-semibold">Upgrade</Link>
             ) : (
               <BillingButton />
             )}
@@ -63,10 +63,10 @@ export default async function Dashboard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-3xl border border-line bg-panel p-5">
+          <div className="sticker rounded-3xl bg-panel p-5">
             <h2 className="text-lg font-bold">Recent conversations</h2>
             {!sessions?.length ? (
-              <p className="mt-3 text-sm text-muted">Nothing yet. <Link href="/demo" className="underline">Start your first one</Link>. Delores is waiting.</p>
+              <p className="mt-3 text-sm text-ink/70">Nothing yet. <Link href="/demo" className="underline">Start your first one</Link>. Delores is waiting.</p>
             ) : (
               <ul className="mt-3 divide-y divide-line text-sm">
                 {sessions.map((s) => {
@@ -74,7 +74,7 @@ export default async function Dashboard() {
                   return (
                     <li key={s.id} className="flex items-center justify-between py-2.5">
                       <span>{c?.emoji} {c?.name ?? s.character_id} · {s.turns} replies</span>
-                      <span className="flex items-center gap-3 text-muted">
+                      <span className="flex items-center gap-3 text-ink/70">
                         {new Date(s.created_at).toLocaleDateString()}
                         <DeleteSession id={s.id} />
                       </span>
@@ -84,16 +84,16 @@ export default async function Dashboard() {
               </ul>
             )}
           </div>
-          <div className="rounded-3xl border border-line bg-panel p-5">
+          <div className="sticker rounded-3xl bg-panel p-5">
             <h2 className="text-lg font-bold">Credit history</h2>
             {!txs?.length ? (
-              <p className="mt-3 text-sm text-muted">Credits appear here after you subscribe or buy a pack.</p>
+              <p className="mt-3 text-sm text-ink/70">Credits appear here after you subscribe or buy a pack.</p>
             ) : (
               <ul className="mt-3 divide-y divide-line text-sm">
                 {txs.map((t) => (
                   <li key={t.id} className="flex justify-between py-2.5">
                     <span className="truncate pr-3">{t.reason}</span>
-                    <span className={t.amount > 0 ? "text-volt" : "text-muted"}>
+                    <span className={t.amount > 0 ? "font-bold text-go" : "text-ink/70"}>
                       {t.amount > 0 ? "+" : ""}{t.amount} {t.status === "refunded" && "(refunded)"}
                     </span>
                   </li>
@@ -104,20 +104,20 @@ export default async function Dashboard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-3xl border border-line bg-panel p-5">
+          <div className="sticker rounded-3xl bg-panel p-5">
             <h2 className="text-lg font-bold">Creator link</h2>
-            <p className="mt-1 text-sm text-muted">Share it. You earn {Math.round(Number(ref?.commission_rate ?? 0.3) * 100)}% of every paid month from people who sign up through it.</p>
-            {ref && <code className="mt-3 block break-all rounded-xl bg-ink p-3 text-sm text-volt">{brand.appUrl}/r/{ref.code}</code>}
+            <p className="mt-1 text-sm text-ink/70">Share it. You earn {Math.round(Number(ref?.commission_rate ?? 0.3) * 100)}% of every paid month from people who sign up through it.</p>
+            {ref && <code className="mt-3 block break-all rounded-xl bg-paper p-3 text-sm font-bold border-2 border-dashed border-ink">{brand.appUrl}/r/{ref.code}</code>}
           </div>
-          <div className="rounded-3xl border border-line bg-panel p-5">
+          <div className="sticker rounded-3xl bg-panel p-5">
             <h2 className="text-lg font-bold">Privacy</h2>
             <PrivacySettings save={profile?.save_transcripts ?? true} days={profile?.transcript_retention_days ?? 30} />
           </div>
         </div>
 
-        <div className="rounded-3xl border border-hot/30 p-5">
+        <div className="sticker rounded-3xl bg-panel p-5">
           <h2 className="text-lg font-bold">Delete account</h2>
-          <p className="mt-1 text-sm text-muted">Cancels your subscription and permanently deletes your conversations, clips and credits.</p>
+          <p className="mt-1 text-sm text-ink/70">Cancels your subscription and permanently deletes your conversations, clips and credits.</p>
           <DeleteAccount />
         </div>
       </div>
