@@ -49,7 +49,11 @@ export function DemoChat({
   const requestId = useRef<string>("");
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [turns, busy]);
+  // Scroll only inside the chat box, and only once a conversation has started (never jump the page on load).
+  useEffect(() => {
+    const box = endRef.current?.parentElement;
+    if (box && turns.length > 0) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+  }, [turns, busy]);
   useEffect(() => {
     window.speechSynthesis?.getVoices(); // warm up voice list
   }, []);
