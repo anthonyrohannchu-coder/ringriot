@@ -47,7 +47,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const call = await startCall(request.to_e164, request.id, request.from_e164);
+    // Older rows may have no from_e164 (null): fall back to the first configured number.
+    const call = await startCall(request.to_e164, request.id, request.from_e164 ?? undefined);
     await db.from("call_requests").update({ status: "calling", consented_at: new Date().toISOString(), credit_tx_id: r.transaction_id, twilio_call_sid: call.sid }).eq("id", request.id);
     return twiml("<Message>Calling you now. Pick up! 📞</Message>");
   } catch (err) {

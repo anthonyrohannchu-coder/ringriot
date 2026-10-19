@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "stripe:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhook",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "call:sim": "tsx scripts/simulate-call.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.60.0",

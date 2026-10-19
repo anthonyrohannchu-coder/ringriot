@@ -49,6 +49,14 @@ This was written without being able to run `npm install` (the build sandbox had 
 5. Verify the account's regulatory/consent requirements, recording laws, and Twilio messaging/voice setup. Run test calls only to numbers you control or recipients who explicitly opt in.
 6. The call flow texts the recipient first; only an affirmative reply initiates a call. Recording disclosure is provided in the SMS and at the beginning of the call. Test SMS STOP, YES, no-answer refunds, and recording access before launch.
 
+## Prank-call scenarios
+
+Scenarios live in `src/lib/scenarios.ts` (persona, setup, escalation beats, ending, no-AI fallback lines) and are attached to characters in `src/lib/characters.ts`. On a live call, `src/lib/callFlow.ts` sends the chosen scenario, the full transcript so far, the sender's name and the number of replies left to the AI every turn. The AI can end the call itself (`<end>`), the last turn is always a wrap-up, "stop"/"hang up" ends it without calling the AI, and two silent turns in a row end it.
+
+Try any scenario from your terminal through the same conversation code (no phone, database or credits): `npm run call:sim -- list`, then e.g. `npm run call:sim -- sal hit-my-car Anthony`. It uses `ANTHROPIC_API_KEY` from your shell if set, otherwise the scripted lines.
+
+**Before deploying the caller-number picker**, apply `supabase/migrations/0004_call_requests_caller_number.sql` (adds `call_requests.from_e164`); without it every call request fails. `0002_real_calls.sql` documents the table the live project already has; don't run it there.
+
 ## Test the payment flow before going live
 
 1. Sign up, open Pricing, buy Plus with card `4242 4242 4242 4242`.

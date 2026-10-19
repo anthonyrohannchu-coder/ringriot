@@ -2,6 +2,7 @@
 // (and give it a look in CharacterFace.tsx). Everything else reads from here.
 // All characters are ORIGINAL fictional people. No real people, no existing IP,
 // no ethnic or racial stereotypes, no sexual characters.
+import { characterStyles, scenarioAdditions } from "./scenarios";
 
 export type VoiceConfig = {
   browser: { pitch: number; rate: number; prefer?: "male" | "female" };
@@ -11,7 +12,22 @@ export type VoiceConfig = {
   elevenlabsVoiceId?: string;
 };
 
-export type Scenario = { id: string; title: string; setup: string; opener: string };
+export type Scenario = {
+  id: string;
+  title: string;
+  /** The situation the AI plays out. */
+  setup: string;
+  /** First line the character says when the call connects. */
+  opener: string;
+  /** Who the character is in THIS call. When set, it replaces the character's default backstory in the prompt. */
+  persona?: string;
+  /** Escalation ideas the AI can use, one at a time, when they fit what the recipient says. */
+  beats?: string[];
+  /** How to land the bit when the call wraps up. */
+  ending?: string;
+  /** Lines used only when no AI provider is configured. */
+  fallbackLines?: string[];
+};
 
 export type Character = {
   id: string;
@@ -21,6 +37,8 @@ export type Character = {
   tier: "free" | "plus" | "pro";
   description: string;
   personality: string;
+  /** Short temperament line used together with a scenario persona. */
+  style?: string;
   voice: VoiceConfig;
   exampleLine: string;
   scenarios: Scenario[];
@@ -385,8 +403,23 @@ export const characters: Character[] = [
   },
 ];
 
+// Attach temperament lines and the prank-call scenarios from scenarios.ts.
+for (const c of characters) {
+  c.style ??= characterStyles[c.id];
+  for (const add of scenarioAdditions[c.id] ?? []) {
+    const i = c.scenarios.findIndex((s) => s.id === add.id);
+    if (i >= 0) c.scenarios[i] = add;
+    else c.scenarios.push(add);
+  }
+}
+
 export function getCharacter(id: string) {
   return characters.find((c) => c.id === id);
+}
+
+/** Exact match only (used where an unknown id must be rejected, e.g. real calls). */
+export function findScenario(character: Character, scenarioId: string) {
+  return character.scenarios.find((s) => s.id === scenarioId) ?? null;
 }
 
 export function getScenario(character: Character, scenarioId: string) {
@@ -395,7 +428,10 @@ export function getScenario(character: Character, scenarioId: string) {
 
 /** Public-safe view: strips prompts and line banks before sending to the browser. */
 export function publicCharacter(c: Character) {
-  const { personality: _p, fallbackLines: _f, spicyLines: _s2, ...rest } = c;
-  return { ...rest, scenarios: c.scenarios.map(({ setup: _s, ...s }) => s) };
+  const { personality: _p, style: _st, fallbackLines: _f, spicyLines: _s2, ...rest } = c;
+  return {
+    ...rest,
+    scenarios: c.scenarios.map(({ id, title, opener }) => ({ id, title, opener })),
+  };
 }
 export type PublicCharacter = ReturnType<typeof publicCharacter>;

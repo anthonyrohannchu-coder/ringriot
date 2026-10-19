@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
-import { getCharacter, getScenario } from "@/lib/characters";
+import { findScenario, getCharacter } from "@/lib/characters";
 import { brand } from "@/config/brand";
 import {
   CALL_CREDIT_COST, RECIPIENT_REQUESTS_PER_DAY, USER_REQUESTS_PER_DAY,
@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
   if (tierRank[character.tier] > tierRank[profile.plan as "plus" | "pro"]) {
     return NextResponse.json({ error: "upgrade_required", message: `${character.name} needs the ${character.tier} plan.` }, { status: 402 });
   }
-  const scenario = getScenario(character, scenarioId);
+  // Exact match: the scenario chosen in the UI is the one the live call plays (no silent fallback).
+  const scenario = findScenario(character, scenarioId);
+  if (!scenario) return NextResponse.json({ error: "unknown_scenario", message: "Pick one of this character's bits." }, { status: 400 });
 
   const { data: bal } = await db.from("credit_balances").select("balance").eq("user_id", user.id).single();
   if ((bal?.balance ?? 0) < CALL_CREDIT_COST) {
