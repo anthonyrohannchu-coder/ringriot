@@ -30,6 +30,7 @@ export const plans = {
     monthlyCredits: 40,
     features: [
       "40 credits every month",
+      "📞 Real calls to friends (3 credits each)",
       "All standard characters",
       "Saved conversations + transcripts",
       "Caption + hook generator for clips",
@@ -44,6 +45,7 @@ export const plans = {
     monthlyCredits: 60,
     features: [
       "60 credits every month",
+      "📞 Real calls with every character",
       "Pro-only characters and scenarios",
       "Premium AI voices",
       "Remove clip watermark",
