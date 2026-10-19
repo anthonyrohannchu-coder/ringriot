@@ -26,12 +26,17 @@ This was written without being able to run `npm install` (the build sandbox had 
 3. **Supabase**: create a project → SQL editor → paste `supabase/migrations/0001_init.sql` → run. Copy URL, anon key, service-role key. In Auth → URL configuration, add `http://localhost:3000/auth/callback` and your production URL.
 4. **AI**: get an Anthropic API key at console.anthropic.com → `ANTHROPIC_API_KEY`. Leave blank to use scripted lines.
 5. **Stripe (test mode)**:
-   - Products → create **Plus** ($9.99 monthly), **Pro** ($19.99 monthly), **25 Credits** ($4.99 one-time). Put the three Price IDs in env.
+   - Products → create **Plus** ($9.99 monthly), **Pro** ($19.99 monthly), **25 Credits** ($4.99 one-time). Put the three Price IDs in env (`STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_CREDITS_25`; comma-separate to keep older prices mapped). The app never creates or edits Stripe products, prices, webhooks or portal settings.
    - Settings → Billing → Customer portal → enable cancel, switch plans (Plus ↔ Pro), update payment method.
    - Webhook endpoint `https://<your-domain>/api/stripe/webhook` with events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, `charge.refunded`. Copy the signing secret.
    - Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the `whsec_` it prints.
 6. `openssl rand -hex 32` → `DEMO_COOKIE_SECRET`
 7. `npm run dev` → http://localhost:3000
+
+## Automated tests
+
+- `npm test`: billing rules (price → plan mapping, which invoices grant credits, out-of-order events, account-deletion handling), run against a copy of a real sandbox invoice.
+- `tests/sql/`: credit-ledger idempotency checks for a **throwaway local Postgres only** (never your Supabase project): load `supabase_stub.sql`, then `supabase/migrations/0001_init.sql`, then `ledger.test.sql`; `concurrent_grant.sh` fires 10 parallel identical grants.
 
 ## Test the payment flow before going live
 

@@ -73,7 +73,7 @@ export default async function Dashboard() {
                   const c = getCharacter(s.character_id);
                   return (
                     <li key={s.id} className="flex items-center justify-between py-2.5">
-                      <span>{c?.emoji} {c?.name ?? s.character_id} · {s.turns} replies</span>
+                      <span>{c?.name ?? s.character_id} · {s.turns} replies</span>
                       <span className="flex items-center gap-3 text-ink/70">
                         {new Date(s.created_at).toLocaleDateString()}
                         <DeleteSession id={s.id} />
@@ -117,7 +117,7 @@ export default async function Dashboard() {
 
         <div className="sticker rounded-3xl bg-panel p-5">
           <h2 className="text-lg font-bold">Delete account</h2>
-          <p className="mt-1 text-sm text-ink/70">Cancels your subscription and permanently deletes your conversations, clips and credits.</p>
+          <p className="mt-1 text-sm text-ink/70">Stops all future charges and permanently deletes your conversations, clips and credits. If your plan is paid through a later date, you'll be asked first.</p>
           <DeleteAccount />
         </div>
       </div>

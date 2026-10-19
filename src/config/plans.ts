@@ -60,9 +60,4 @@ export const creditPack = {
   stripePriceEnv: "STRIPE_PRICE_CREDITS_25",
 };
 
-export function planForPriceId(priceId: string | null | undefined): PlanId | null {
-  if (!priceId) return null;
-  if (priceId === process.env.STRIPE_PRICE_PLUS) return "plus";
-  if (priceId === process.env.STRIPE_PRICE_PRO) return "pro";
-  return null;
-}
+// Price ID -> plan mapping lives in src/lib/stripePrices.ts (env vars named above, comma-separated lists allowed).
