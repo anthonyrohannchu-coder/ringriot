@@ -21,6 +21,19 @@ export async function POST(req: NextRequest) {
     email_confirm: true,
     user_metadata: ref ? { ref } : {},
   });
+  if (error && /already|registered|exists/i.test(error.message)) {
+    // An account that was created (e.g. by an old email-link attempt) but never logged into
+    // holds no data, so let the person claim it by setting their password.
+    const { data: unusedId } = await supabaseAdmin().rpc("unused_account_id", { p_email: parsed.data.email });
+    if (unusedId) {
+      const { error: upd } = await supabaseAdmin().auth.admin.updateUserById(unusedId as string, {
+        password: parsed.data.password,
+        email_confirm: true,
+      });
+      if (!upd) return NextResponse.json({ ok: true, claimed: true });
+      console.error("claim failed", upd.message);
+    }
+  }
   if (error) {
     const exists = /already|registered|exists/i.test(error.message);
     console.error("signup failed", error.message);
