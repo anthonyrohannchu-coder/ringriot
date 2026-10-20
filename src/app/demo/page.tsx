@@ -5,8 +5,8 @@ import { premiumTtsEnabled } from "@/lib/tts";
 
 export const metadata = { title: "Try a character" };
 
-export default async function DemoPage({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
-  const { c } = await searchParams;
+export default async function DemoPage({ searchParams }: { searchParams: Promise<{ c?: string; s?: string }> }) {
+  const { c, s } = await searchParams;
   const user = await getUser().catch(() => null);
   let plan = "free";
   if (user) {
@@ -23,6 +23,7 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
           characters={characters.map(publicCharacter)}
           mode={paid ? "paid" : "demo"}
           initialCharacterId={characters.some((x) => x.id === c) ? c : undefined}
+          initialScenarioId={s}
           premiumVoice={paid && plan === "pro" && premiumTtsEnabled()}
         />
       </div>
