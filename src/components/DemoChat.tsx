@@ -48,10 +48,12 @@ export function DemoChat({
   initialCharacterId?: string;
   initialScenarioId?: string;
 }) {
+  // In the free demo, a link to a Plus/Pro prank opens on a free one instead of a call that can't start.
+  const usable = (p: Prank) => mode !== "demo" || p.tier === "free";
   const startPrank =
-    pranks.find((p) => p.characterId === initialCharacterId && p.scenarioId === initialScenarioId) ??
-    pranks.find((p) => p.characterId === initialCharacterId) ??
-    pranks.find((p) => mode !== "demo" || p.tier === "free") ??
+    pranks.find((p) => usable(p) && p.characterId === initialCharacterId && p.scenarioId === initialScenarioId) ??
+    pranks.find((p) => usable(p) && p.characterId === initialCharacterId) ??
+    pranks.find(usable) ??
     pranks[0];
   const [charId, setCharId] = useState(startPrank.characterId);
   const character = useMemo(() => characters.find((c) => c.id === charId)!, [characters, charId]);
