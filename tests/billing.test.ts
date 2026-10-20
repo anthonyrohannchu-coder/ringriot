@@ -148,3 +148,12 @@ test("account deletion: stop renewals for paid periods, cancel failed-payment su
   assert.equal(deletionActionFor("incomplete", false), "cancel_now");
   assert.equal(deletionActionFor("canceled", false), "none");
 });
+
+test("refunded credit pack takes back unspent credits only", async () => {
+  const { packClawback, packClawbackKey } = await import("../src/lib/billing");
+  assert.equal(packClawback({ packCredits: 25, amountPaidCents: 499, amountRefundedCents: 499, balance: 40 }), 25, "full refund: all 25");
+  assert.equal(packClawback({ packCredits: 25, amountPaidCents: 499, amountRefundedCents: 499, balance: 10 }), 10, "never below zero");
+  assert.equal(packClawback({ packCredits: 25, amountPaidCents: 500, amountRefundedCents: 250, balance: 40 }), 13, "half refund: about half");
+  assert.equal(packClawback({ packCredits: 25, amountPaidCents: 499, amountRefundedCents: 0, balance: 40 }), 0);
+  assert.equal(packClawbackKey("cs_1"), "packrefund:cs_1", "one clawback per checkout session, even if Stripe resends");
+});

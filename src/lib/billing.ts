@@ -178,3 +178,16 @@ export function deletionActionFor(status: string, cancelAtPeriodEnd: boolean): S
   if (status === "active" || status === "trialing") return cancelAtPeriodEnd ? "none" : "cancel_at_period_end";
   return "cancel_now";
 }
+
+// ---------- Refunds ----------
+
+/**
+ * Credits to take back when a credit-pack payment is refunded: the pack's credits, scaled for a partial
+ * refund, but never more than the buyer still has (credits already spent can't be un-spent).
+ */
+export function packClawback(o: { packCredits: number; amountPaidCents: number; amountRefundedCents: number; balance: number }) {
+  if (o.amountPaidCents <= 0 || o.amountRefundedCents <= 0) return 0;
+  const share = Math.min(1, o.amountRefundedCents / o.amountPaidCents);
+  return Math.max(0, Math.min(o.balance, Math.round(o.packCredits * share)));
+}
+export const packClawbackKey = (checkoutSessionId: string) => `packrefund:${checkoutSessionId}`;
