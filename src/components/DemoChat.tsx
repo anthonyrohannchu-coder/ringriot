@@ -6,6 +6,9 @@ import type { PublicCharacter } from "@/lib/characters";
 import { PersonFace } from "./PersonFace";
 import { Waveform } from "./Waveform";
 import { playPreview, stopPreview } from "@/lib/previewAudio";
+import type { CategoryId, Prank } from "@/lib/prankCategories";
+import { categories } from "@/lib/prankCategories";
+import { PrankArt } from "./PrankArt";
 
 type Turn = { role: "user" | "character"; text: string };
 type Mode = "demo" | "paid";
@@ -33,20 +36,28 @@ const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${Str
 
 export function DemoChat({
   characters,
+  pranks,
   mode,
   initialCharacterId,
   initialScenarioId,
 }: {
   characters: PublicCharacter[];
+  /** The situations to pick from (situation-first picker). */
+  pranks: Prank[];
   mode: Mode;
   initialCharacterId?: string;
   initialScenarioId?: string;
 }) {
-  const [charId, setCharId] = useState(initialCharacterId ?? characters[0].id);
+  const startPrank =
+    pranks.find((p) => p.characterId === initialCharacterId && p.scenarioId === initialScenarioId) ??
+    pranks.find((p) => p.characterId === initialCharacterId) ??
+    pranks.find((p) => mode !== "demo" || p.tier === "free") ??
+    pranks[0];
+  const [charId, setCharId] = useState(startPrank.characterId);
   const character = useMemo(() => characters.find((c) => c.id === charId)!, [characters, charId]);
-  const [scenarioId, setScenarioId] = useState(
-    initialScenarioId && character.scenarios.some((s) => s.id === initialScenarioId) ? initialScenarioId : character.scenarios[0].id,
-  );
+  const [scenarioId, setScenarioId] = useState(startPrank.scenarioId);
+  const [cat, setCat] = useState<CategoryId | "all">("all");
+  const [hearing, setHearing] = useState(false);
   const scenario = character.scenarios.find((s) => s.id === scenarioId) ?? character.scenarios[0];
 
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -84,11 +95,9 @@ export function DemoChat({
     return () => clearInterval(t);
   }, [started]);
 
-  function reset(nextChar = charId) {
+  /** Hang up: back to the incoming-call screen for the same situation. */
+  function reset() {
     stopPreview();
-    const c = characters.find((x) => x.id === nextChar)!;
-    setCharId(nextChar);
-    setScenarioId(c.scenarios[0].id);
     setTurns([]);
     setStarted(false);
     setDeclines(0);
@@ -206,56 +215,60 @@ export function DemoChat({
     });
   }
 
-  const accent = character.accent;
-  const locked = (c: PublicCharacter) => mode === "demo" && c.tier !== "free";
-  const first = character.name.split(" ")[0].replace(".", "");
+  const current = pranks.find((p) => p.characterId === charId && p.scenarioId === scenario.id);
+  function pick(p: Prank) {
+    stopPreview();
+    setHearing(false);
+    setCharId(p.characterId);
+    setScenarioId(p.scenarioId);
+    setTurns([]);
+    setStarted(false);
+    setSessionId(null);
+    setDeclines(0);
+    setSeconds(0);
+    setError(null);
+    setClip(null);
+  }
+
+  const accent = current ? categories.find((c) => c.id === current.category)?.color ?? character.accent : character.accent;
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[1fr_420px]">
       {/* Character picker */}
       <div className="order-2 space-y-5 lg:order-1">
         <div>
-          <p className="label mb-3">1 · Pick who calls</p>
-          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-3 sm:grid sm:grid-cols-4 sm:overflow-visible">
-            {characters.map((c) => {
-              const active = c.id === charId;
+          <p className="label mb-3">1 · Pick the situation</p>
+          <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
+            {[{ id: "all" as const, short: "All", color: "#fff" }, ...categories].map((c) => (
+              <button key={c.id} onClick={() => setCat(c.id)} aria-pressed={cat === c.id}
+                className={`sticker-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-extrabold ${cat === c.id ? "bg-ink text-paper" : "press bg-panel"}`}>
+                {c.id !== "all" && <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full border-2 border-ink align-middle" style={{ background: c.color }} />}
+                {c.short}
+              </button>
+            ))}
+          </div>
+          <div className="grid max-h-[520px] grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3">
+            {pranks.filter((p) => cat === "all" || p.category === cat).map((p) => {
+              const active = p.characterId === charId && p.scenarioId === scenario.id;
+              const isLocked = mode === "demo" && p.tier !== "free";
               return (
-                <button
-                  key={c.id}
-                  onClick={() => !locked(c) && reset(c.id)}
-                  aria-pressed={active}
-                  className={`sticker-sm relative min-w-[118px] rounded-2xl p-3 text-left transition ${active ? "-rotate-2 scale-[1.03]" : "press"} ${locked(c) ? "cursor-not-allowed opacity-60" : ""}`}
-                  style={{ background: active ? c.accent : "#fff" }}
-                >
-                  {c.scenarios[0].look ? <PersonFace look={c.scenarios[0].look} size={48} /> : null}
-                  <div className="mt-1 text-sm font-extrabold leading-tight">{c.name}</div>
-                  <div className="text-[11px] font-medium leading-tight text-ink/70">{c.archetype.replace("The ", "")}</div>
-                  {locked(c) && (
-                    <span className="sticker-sm absolute -right-2 -top-2 rotate-6 rounded-full bg-volt px-2 py-0.5 text-[10px] font-extrabold uppercase">
-                      🔒 {c.tier}
-                    </span>
+                <button key={p.slug} onClick={() => !isLocked && pick(p)} aria-pressed={active} disabled={isLocked}
+                  className={`sticker-sm relative overflow-hidden rounded-2xl bg-panel text-left transition ${active ? "ring-4 ring-ink -rotate-1" : "press"} ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}>
+                  <PrankArt prank={p} size="sm" />
+                  <div className="p-2.5">
+                    <div className="text-sm font-extrabold leading-tight">{p.title}</div>
+                  </div>
+                  {isLocked && (
+                    <span className="sticker-sm absolute right-2 top-2 rotate-6 rounded-full bg-volt px-2 py-0.5 text-[10px] font-extrabold uppercase">🔒 {p.tier}</span>
                   )}
                 </button>
               );
             })}
           </div>
+          {mode === "demo" && <p className="mt-2 text-xs font-bold text-ink/60">🔒 pranks come with Plus and Pro. <Link href="/pricing" className="underline">See plans</Link></p>}
         </div>
         <div>
-          <p className="label mb-3">2 · Pick the situation</p>
-          <div className="flex flex-wrap gap-2">
-            {character.scenarios.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => { setScenarioId(s.id); setTurns([]); setStarted(false); setSessionId(null); setDeclines(0); }}
-                className={`sticker-sm rounded-full px-4 py-2 text-sm font-bold ${s.id === scenario.id ? "bg-ink text-paper" : "press bg-panel"}`}
-              >
-                {s.title}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="label mb-3">3 · Pick the vibe</p>
+          <p className="label mb-3">2 · Pick the vibe</p>
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => { setSpicy(false); setAgeAsk(false); }}
@@ -280,11 +293,18 @@ export function DemoChat({
             </div>
           )}
         </div>
-        <div className="sticker tilt-l hidden rounded-2xl bg-panel p-4 lg:block">
-          <p className="label text-hot">Sample line</p>
-          <p className="mt-1 text-lg font-bold">&ldquo;{character.exampleLine}&rdquo;</p>
-          <p className="mt-1 text-sm text-muted">— {character.name}</p>
-        </div>
+        {current && (
+          <div className="sticker tilt-l hidden rounded-2xl bg-panel p-4 lg:block">
+            <p className="label text-hot">How it opens</p>
+            <p className="mt-1 text-lg font-bold">&ldquo;{current.opener}&rdquo;</p>
+            <p className="mt-1 text-sm font-medium text-ink/70">{current.blurb}</p>
+            <button type="button"
+              onClick={() => { if (hearing) { stopPreview(); setHearing(false); } else { setHearing(true); playPreview(current.slug, current.opener, { onEnd: () => setHearing(false) }); } }}
+              className="sticker-sm press mt-3 rounded-full bg-panel px-3 py-1.5 text-sm font-extrabold">
+              {hearing ? "■ Stop" : "▶ Hear it"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Phone */}
@@ -301,8 +321,8 @@ export function DemoChat({
                   <div className="ring mx-auto mt-6 w-fit">
                     {scenario.look && <PersonFace look={scenario.look} size={150} />}
                   </div>
-                  <h3 className="mt-4 text-3xl leading-none">{character.name}</h3>
-                  <p className="mt-2 font-semibold text-ink/70">{scenario.title}</p>
+                  <h3 className="mt-4 text-3xl leading-none">{current?.title ?? scenario.title}</h3>
+                  <p className="mt-2 font-semibold text-ink/70">Unknown caller</p>
                   <p className="sticker-sm mx-auto mt-4 w-fit rounded-full bg-panel px-3 py-1 text-[11px] font-bold">◉ Browser simulation · not a real call</p>
                   {declinedFlash && <p className="rise mt-4 font-extrabold">{DECLINE_LINES[Math.min(declines - 1, 2)]}</p>}
                 </div>
@@ -328,7 +348,7 @@ export function DemoChat({
                   <div className="flex items-center gap-2.5">
                     {scenario.look && <PersonFace look={scenario.look} size={46} talking={speaking} />}
                     <div>
-                      <div className="font-extrabold leading-tight">{character.name}</div>
+                      <div className="font-extrabold leading-tight">{current?.title ?? scenario.title}</div>
                       <div className="flex items-center gap-1.5 text-xs font-bold">
                         <Waveform active={speaking || busy} color="#17121a" />
                         {busy ? "thinking…" : speaking ? "talking" : fmt(seconds)}
@@ -357,7 +377,7 @@ export function DemoChat({
                       </div>
                     </div>
                   ))}
-                  {busy && <div className="rise text-sm font-bold text-ink/60">{first} is typing…</div>}
+                  {busy && <div className="rise text-sm font-bold text-ink/60">Typing…</div>}
                   {error && (
                     <div className="rise sticker-sm rounded-2xl bg-volt p-3 text-sm font-semibold">
                       {error.message}
@@ -395,7 +415,7 @@ export function DemoChat({
                     id="demo-input"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={listening ? "Listening…" : `Say something to ${first}…`}
+                    placeholder={listening ? "Listening…" : "Say something back…"}
                     maxLength={500}
                     className="h-11 min-w-0 flex-1 rounded-full border-[2.5px] border-ink bg-paper px-4 text-[15px] font-medium outline-none focus:bg-white"
                   />
