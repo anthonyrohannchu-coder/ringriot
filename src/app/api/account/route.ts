@@ -1,3 +1,4 @@
+import { isMissingCustomerError } from "@/lib/stripeCustomer";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
@@ -59,7 +60,14 @@ export async function DELETE(req: NextRequest) {
 /** Stripe is the source of truth when we know the customer; our mirror table is the fallback. */
 async function listSubscriptions(userId: string, customerId: string | null): Promise<DeletionSub[]> {
   if (customerId && stripeConfigured()) {
-    const res = await stripe().subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+    let res;
+    try {
+      res = await stripe().subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+    } catch (err) {
+      // A customer from the other Stripe mode has no subscriptions here.
+      if (isMissingCustomerError(err)) return [];
+      throw err;
+    }
     return res.data.map((s) => {
       const end =
         (s.items.data[0] as unknown as { current_period_end?: number } | undefined)?.current_period_end ??

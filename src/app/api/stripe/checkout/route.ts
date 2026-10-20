@@ -1,3 +1,4 @@
+import { usableCustomerId } from "@/lib/stripeCustomer";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { stripe, stripeConfigured } from "@/lib/stripe";
@@ -39,7 +40,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    let customerId = profile?.stripe_customer_id as string | null;
+    // A customer id saved in test mode doesn't exist in live mode: replace it instead of failing.
+    let customerId = await usableCustomerId(profile?.stripe_customer_id as string | null, (id) => stripe().customers.retrieve(id));
     if (customerId && isSub) {
       // Ask Stripe too, in case our copy of the plan is stale (e.g. a webhook hasn't landed yet).
       const subs = await stripe().subscriptions.list({ customer: customerId, status: "all", limit: 20 });

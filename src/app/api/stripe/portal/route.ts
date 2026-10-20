@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe, stripeConfigured } from "@/lib/stripe";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
 import { brand } from "@/config/brand";
+import { usableCustomerId } from "@/lib/stripeCustomer";
 
 // Uses the Stripe account's existing default Customer Portal configuration. Nothing is created here;
 // if no portal is configured in the Stripe dashboard, this returns an error instead.
@@ -14,8 +15,10 @@ export async function POST() {
   if (!data?.stripe_customer_id) return NextResponse.json({ error: "no_billing_account" }, { status: 404 });
 
   try {
+    const customer = await usableCustomerId(data.stripe_customer_id, (id) => stripe().customers.retrieve(id));
+    if (!customer) return NextResponse.json({ error: "no_billing_account", message: "No billing history yet." }, { status: 404 });
     const portal = await stripe().billingPortal.sessions.create({
-      customer: data.stripe_customer_id,
+      customer,
       return_url: `${brand.appUrl}/dashboard`,
     });
     return NextResponse.json({ url: portal.url });
