@@ -110,7 +110,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
       const r = await fetch("/api/calls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senderName: senderName.trim(), phone: normalizeNumber(phone), callerNumber, characterId: prank.characterId, scenarioId: prank.scenarioId }),
+        body: JSON.stringify({ senderName: senderName.trim(), phone: normalizeNumber(phone), callerNumber, characterId: prank.characterId, scenarioId: prank.scenarioId, senderAttests: consent }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -290,7 +290,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
                 <label className="flex items-start gap-3 rounded-2xl border-2 border-dashed border-ink/30 p-3">
                   <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 accent-[#17121a]" />
                   <span className="text-sm font-semibold">
-                    This is my friend, they&apos;re 13 or older, and they&apos;d be OK with a prank call. I understand they&apos;ll be asked to reply YES first, and the call says up front that it&apos;s AI and recorded.
+                    This is my friend, they&apos;re 13 or older, it&apos;s their number, and they&apos;ve agreed to get prank calls from me. I&apos;m responsible for this call under the <Link href="/legal/terms" className="underline">Terms</Link>. The call says up front that it&apos;s AI and recorded.
                   </span>
                 </label>
                 {touched && problem && <p className="text-sm font-bold text-nope">{problem}</p>}
