@@ -181,13 +181,25 @@ export function deletionActionFor(status: string, cancelAtPeriodEnd: boolean): S
 
 // ---------- Refunds ----------
 
-/**
- * Credits to take back when a credit-pack payment is refunded: the pack's credits, scaled for a partial
- * refund, but never more than the buyer still has (credits already spent can't be un-spent).
- */
-export function packClawback(o: { packCredits: number; amountPaidCents: number; amountRefundedCents: number; balance: number }) {
+/** Credits a credit-pack refund should have taken back in total, given the cumulative refunded amount. */
+export function packClawbackTarget(o: { packCredits: number; amountPaidCents: number; amountRefundedCents: number }) {
   if (o.amountPaidCents <= 0 || o.amountRefundedCents <= 0) return 0;
   const share = Math.min(1, o.amountRefundedCents / o.amountPaidCents);
-  return Math.max(0, Math.min(o.balance, Math.round(o.packCredits * share)));
+  return Math.round(o.packCredits * share);
 }
-export const packClawbackKey = (checkoutSessionId: string) => `packrefund:${checkoutSessionId}`;
+
+/**
+ * Credits to take back NOW: what the refunds so far should have taken, minus what was already taken,
+ * never more than the buyer still has (credits already spent on calls can't be un-spent).
+ */
+export function packClawbackDelta(o: { packCredits: number; amountPaidCents: number; amountRefundedCents: number; alreadyClawed: number; balance: number }) {
+  const owed = packClawbackTarget(o) - o.alreadyClawed;
+  return Math.max(0, Math.min(o.balance, owed));
+}
+
+/**
+ * One ledger key per cumulative refunded amount: a resent Stripe event reuses the key (no double clawback),
+ * while a second partial refund has a new cumulative amount and takes back only the difference.
+ */
+export const packClawbackKey = (checkoutSessionId: string, amountRefundedCents: number) => `packrefund:${checkoutSessionId}:${amountRefundedCents}`;
+export const packClawbackPrefix = (checkoutSessionId: string) => `packrefund:${checkoutSessionId}:`;

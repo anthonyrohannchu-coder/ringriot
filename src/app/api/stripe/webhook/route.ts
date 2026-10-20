@@ -3,11 +3,12 @@ import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { grantCredits, reserveCredits, settleCredits } from "@/lib/credits";
+import { handlePackRefund } from "@/lib/refunds";
 import { creditPack, plans } from "@/config/plans";
 import { getPriceMap } from "@/lib/stripePrices";
 import {
   invoiceCustomerId, invoiceGrantKey, invoiceGrantsMonthlyCredits, invoicePlan, invoiceSubscriptionId,
-  invoiceUserId, isEntitled, isStaleSubscriptionEvent, packClawback, packClawbackKey, packGrantKey, planForPrice, unmappedInvoicePrices,
+  invoiceUserId, isEntitled, isStaleSubscriptionEvent, packGrantKey, planForPrice, unmappedInvoicePrices,
   type InvoiceLike,
 } from "@/lib/billing";
 
@@ -162,21 +163,25 @@ export async function POST(req: NextRequest) {
         if (invId) {
           await db.from("referral_conversions").update({ status: "refunded", commission_cents: 0 }).eq("stripe_invoice_id", invId);
         }
-        // Credit-pack refund: take back the unspent credits from that pack (subscriptions are cancelled in the portal).
-        const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id;
-        if (!invId && pi) {
-          const sessions = await stripe().checkout.sessions.list({ payment_intent: pi, limit: 1 });
-          const cs = sessions.data[0];
-          const userId = cs?.metadata?.user_id || cs?.client_reference_id;
-          if (cs && userId && cs.metadata?.product === "credits_25") {
-            const { data: bal } = await db.from("credit_balances").select("balance").eq("user_id", userId).maybeSingle();
-            const n = packClawback({ packCredits: creditPack.credits, amountPaidCents: ch.amount, amountRefundedCents: ch.amount_refunded, balance: bal?.balance ?? 0 });
-            if (n > 0) {
-              const r = await reserveCredits(userId, n, packClawbackKey(cs.id), "credit pack refunded");
-              if (r.ok && r.transaction_id) await settleCredits(r.transaction_id);
-            }
-          }
-        }
+        // Credit-pack refund: take back that pack's unspent credits (subscriptions are cancelled in the portal).
+        await handlePackRefund(
+          { id: ch.id, amount: ch.amount, amount_refunded: ch.amount_refunded, invoice: invId ?? null,
+            payment_intent: typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id ?? null },
+          {
+            packCredits: creditPack.credits,
+            findSession: async (pi) => {
+              const cs = (await stripe().checkout.sessions.list({ payment_intent: pi, limit: 1 })).data[0];
+              return cs ? { id: cs.id, userId: cs.metadata?.user_id || cs.client_reference_id || null, product: cs.metadata?.product ?? null } : null;
+            },
+            balance: async (userId) => (await db.from("credit_balances").select("balance").eq("user_id", userId).maybeSingle()).data?.balance ?? 0,
+            clawedSoFar: async (userId, prefix) => {
+              const { data } = await db.from("credit_transactions").select("amount").eq("user_id", userId).like("idempotency_key", `${prefix}%`);
+              return (data ?? []).reduce((sum, t) => sum - Number(t.amount), 0);
+            },
+            reserve: (userId, n, key) => reserveCredits(userId, n, key, "credit pack refunded"),
+            settle: settleCredits,
+          },
+        );
         break;
       }
     }
