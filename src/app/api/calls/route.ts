@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { z } from "zod";
+import { CallRequestBody } from "@/lib/callRequest";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
 import { findScenario, getCharacter } from "@/lib/characters";
 import { brand } from "@/config/brand";
@@ -10,15 +10,7 @@ import {
   configuredCallerNumbers, ensureNumberWebhook, hashNumber, isAllowedCallerNumber, normalizeNumber, sendSms, startCall, twilioConfigured, withinQuietHours,
 } from "@/lib/twilio";
 
-const Body = z.object({
-  senderName: z.string().trim().min(1).max(30).regex(/^[\p{L}\p{N} .'\-]+$/u, "Use letters, numbers and spaces only"),
-  phone: z.string().min(7).max(25),
-  characterId: z.string().max(40),
-  scenarioId: z.string().max(60),
-  callerNumber: z.string().optional(),
-  /** The sender's promise that the friend agreed (Terms of Service). Required for every call. */
-  senderAttests: z.literal(true, { errorMap: () => ({ message: "Confirm your friend agreed to get prank calls from you." }) }),
-});
+const Body = CallRequestBody;
 
 const tierRank = { free: 0, plus: 1, pro: 2 } as const;
 
@@ -86,8 +78,12 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
   if (error || !request) return NextResponse.json({ error: "server_error" }, { status: 500 });
-  // Keep the sender's promise on record next to the call (hashed number only).
-  await db.from("consent_records").insert({ user_id: user.id, kind: "sender_attestation", recipient_hash: toHash });
+  // Keep the sender's promise on record next to the call (hashed number only). No record, no call.
+  const attest = await db.from("consent_records").insert({ user_id: user.id, kind: "sender_attestation", recipient_hash: toHash });
+  if (attest.error) {
+    await db.from("call_requests").update({ status: "failed", to_e164: null }).eq("id", request.id);
+    return NextResponse.json({ error: "server_error", message: "Couldn't save your confirmation. Nothing was sent." }, { status: 500 });
+  }
 
   // Friend already opted in to this sender's pranks: ring right away, no text.
   if (standing?.length) {
