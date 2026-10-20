@@ -63,7 +63,7 @@ export function envChecks(env: Record<string, string | undefined>, origin: strin
       : `${valid.length} number(s): ${valid.join(", ")}`));
 
   out.push(check("env.ADMIN_EMAILS", has(env.ADMIN_EMAILS), "info", has(env.ADMIN_EMAILS) ? "set" : "not set"));
-  out.push(check("env.ELEVENLABS_API_KEY", true, "info", has(env.ELEVENLABS_API_KEY) ? "set: calls use ElevenLabs voices" : "not set: calls use Amazon Polly voices (fine)"));
+  out.push(check("env.ELEVENLABS_API_KEY", true, "info", has(env.ELEVENLABS_API_KEY) ? (env.ELEVENLABS_FOR_CALLS === "1" ? "set: previews and live calls use ElevenLabs" : "set: prank previews use ElevenLabs; calls use natural Twilio voices") : "not set: previews fall back to the browser voice; calls use natural Twilio voices"));
   return out;
 }
 

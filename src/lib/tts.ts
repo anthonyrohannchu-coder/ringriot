@@ -1,10 +1,16 @@
-// Server-side premium TTS. Returns null when not configured; the browser then
-// uses its own free voices with each character's pitch/rate.
+// ElevenLabs text-to-speech, used for (1) pre-recorded prank previews and (2) optionally the live
+// call voice. Calls use Twilio's natural Google voices unless ELEVENLABS_FOR_CALLS=1, because
+// ElevenLabs on every call line costs far more per call.
 
 const costPer1k = Number(process.env.TTS_COST_PER_1K_CHARS || 0.1);
 
 export function elevenlabsAvailable() {
   return !!process.env.ELEVENLABS_API_KEY;
+}
+
+/** Live calls speak through ElevenLabs only when explicitly enabled (cost control). */
+export function elevenlabsForCalls() {
+  return elevenlabsAvailable() && process.env.ELEVENLABS_FOR_CALLS === "1";
 }
 
 /** Voice for a character: ELEVENLABS_VOICE_MAP (JSON {"tony":"voiceId"}) overrides the defaults. */
@@ -17,12 +23,12 @@ export function voiceFor(characterId: string, fallback?: string) {
   }
 }
 
-export function premiumTtsEnabled() {
-  return process.env.TTS_PROVIDER === "elevenlabs" && !!process.env.ELEVENLABS_API_KEY;
-}
-
-export async function synthesize(text: string, voiceId: string, opts: { force?: boolean; format?: string } = {}) {
-  if (!(opts.force ? elevenlabsAvailable() : premiumTtsEnabled())) return null;
+export async function synthesize(
+  text: string,
+  voiceId: string,
+  opts: { format?: string; model?: string; voiceSettings?: Record<string, number | boolean> } = {},
+) {
+  if (!elevenlabsAvailable()) return null;
   const fmt = opts.format ? `?output_format=${opts.format}` : "";
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}${fmt}`, {
     method: "POST",
@@ -31,8 +37,12 @@ export async function synthesize(text: string, voiceId: string, opts: { force?: 
       "Content-Type": "application/json",
       Accept: "audio/mpeg",
     },
-    body: JSON.stringify({ text, model_id: process.env.ELEVENLABS_MODEL || "eleven_flash_v2_5" }),
-    signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({
+      text,
+      model_id: opts.model || process.env.ELEVENLABS_MODEL || "eleven_flash_v2_5",
+      ...(opts.voiceSettings ? { voice_settings: opts.voiceSettings } : {}),
+    }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
   const audio = Buffer.from(await res.arrayBuffer());

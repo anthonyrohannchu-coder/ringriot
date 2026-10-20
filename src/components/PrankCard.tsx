@@ -5,16 +5,7 @@ import { useState } from "react";
 import type { Prank } from "@/lib/prankCategories";
 import { categoryOf } from "@/lib/prankCategories";
 import { PrankArt } from "./PrankArt";
-
-function speak(text: string) {
-  const s = typeof window !== "undefined" ? window.speechSynthesis : undefined;
-  if (!s) return false;
-  s.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05;
-  s.speak(u);
-  return true;
-}
+import { playPreview, stopPreview } from "@/lib/previewAudio";
 
 export function TierBadge({ tier }: { tier: Prank["tier"] }) {
   return (
@@ -26,6 +17,7 @@ export function TierBadge({ tier }: { tier: Prank["tier"] }) {
 
 export function PrankCard({ prank, tilt = 0 }: { prank: Prank; tilt?: number }) {
   const [open, setOpen] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const cat = categoryOf(prank.category);
   return (
     <article
@@ -51,11 +43,11 @@ export function PrankCard({ prank, tilt = 0 }: { prank: Prank; tilt?: number }) 
         <div className="mt-4 flex gap-2">
           <button
             type="button"
-            onClick={() => { const next = !open; setOpen(next); if (next) speak(prank.opener); else window.speechSynthesis?.cancel(); }}
-            aria-expanded={open}
+            onClick={() => { if (playing) { stopPreview(); setPlaying(false); return; } setOpen(true); setPlaying(true); playPreview(prank.slug, prank.opener, { onEnd: () => setPlaying(false) }); }}
+            aria-pressed={playing}
             className="sticker-sm press rounded-full bg-panel px-3 py-2 text-sm font-extrabold"
           >
-            {open ? "■ Stop" : "▶ Preview"}
+            {playing ? "■ Stop" : "▶ Preview"}
           </button>
           <Link href={`/call?prank=${prank.slug}`} className="sticker-sm press flex-1 rounded-full bg-ink px-3 py-2 text-center text-sm font-extrabold text-volt">
             Send this prank

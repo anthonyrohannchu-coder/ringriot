@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const text = line.text.replace(/\*[^*]{1,30}\*/g, "");
 
   try {
-    const out = await synthesize(text, voiceFor(c.id, c.voice.elevenlabsVoiceId) ?? "", { force: true, format: "mp3_22050_32" });
+    const out = await synthesize(text, voiceFor(c.id, c.voice.elevenlabsVoiceId) ?? "", { format: "mp3_22050_32" });
     if (!out) throw new Error("tts unavailable");
     await logProviderUsage({ user_id: r.user_id, provider: "elevenlabs", kind: "tts", units: text.length, cost_usd: out.costUsd });
     return new NextResponse(new Uint8Array(out.audio), { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" } });

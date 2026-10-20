@@ -1,7 +1,6 @@
 import { characters, publicCharacter } from "@/lib/characters";
 import { DemoChat } from "@/components/DemoChat";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
-import { premiumTtsEnabled } from "@/lib/tts";
 
 export const metadata = { title: "Try a character" };
 
@@ -24,7 +23,6 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
           mode={paid ? "paid" : "demo"}
           initialCharacterId={characters.some((x) => x.id === c) ? c : undefined}
           initialScenarioId={s}
-          premiumVoice={paid && plan === "pro" && premiumTtsEnabled()}
         />
       </div>
     </section>
