@@ -11,6 +11,9 @@ const pages: Record<string, { title: string; body: string[] }> = {
       "Subscriptions renew monthly until canceled. You can cancel anytime from your dashboard; access continues until the end of the paid period. Credits have no cash value.",
       "We may suspend accounts that break the Acceptable Use policy, without refund for the current period.",
       "The service is provided as-is. AI output can be unpredictable; you are responsible for how you share it.",
+      "Real phone calls: you may only send a call to someone you know personally who has agreed to receive prank calls from you. Each time you send a call you confirm that this is true, that the person is 13 or older, and that the number is theirs.",
+      `${brand.name} also asks every person to opt in (by text reply or invite link) before their first call, and anyone can text STOP to block all calls. These steps do not replace your own promise above.`,
+      `You are responsible for the calls you send. If you send a call without the person's permission, you agree to cover the losses, fines and legal costs this causes ${brand.name}, and we may close your account without refund and keep records of the calls you sent.`,
     ],
   },
   privacy: {
@@ -29,7 +32,7 @@ const pages: Record<string, { title: string; body: string[] }> = {
       "Keep it fun and consensual. Characters are fictional and must stay that way.",
       "Not allowed: harassment, threats, bullying, hate, sexual content involving anyone, targeting minors, or anything that frightens or humiliates a real person.",
       "Not allowed: impersonating real people, businesses, police, government, banks or emergency services; caller-ID spoofing; calling emergency numbers.",
-      "Real phone calls (when available) may only go to people who have agreed to receive them. Calls include caller identification and a recording disclosure.",
+      "Real phone calls may only go to people who have agreed to receive them from you. Every call opens by saying it is an AI comedy call and that it is recorded, and comes from a RingRiot number, never a spoofed one.",
       "Shared clips must be labeled as AI-generated and must not include anyone's voice without their permission.",
     ],
   },

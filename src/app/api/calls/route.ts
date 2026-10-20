@@ -16,6 +16,8 @@ const Body = z.object({
   characterId: z.string().max(40),
   scenarioId: z.string().max(60),
   callerNumber: z.string().optional(),
+  /** The sender's promise that the friend agreed (Terms of Service). Required for every call. */
+  senderAttests: z.literal(true, { errorMap: () => ({ message: "Confirm your friend agreed to get prank calls from you." }) }),
 });
 
 const tierRank = { free: 0, plus: 1, pro: 2 } as const;
@@ -84,6 +86,8 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
   if (error || !request) return NextResponse.json({ error: "server_error" }, { status: 500 });
+  // Keep the sender's promise on record next to the call (hashed number only).
+  await db.from("consent_records").insert({ user_id: user.id, kind: "sender_attestation", recipient_hash: toHash });
 
   // Friend already opted in to this sender's pranks: ring right away, no text.
   if (standing?.length) {
