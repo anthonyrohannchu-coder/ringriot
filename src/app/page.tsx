@@ -148,7 +148,7 @@ export default function Home() {
           <h2 className="text-4xl md:text-5xl">Try it on yourself first.</h2>
           <p className="mt-2 text-lg font-semibold text-muted">Answer a prank in your browser and talk back. Free, no signup. Turn your sound on.</p>
           <div className="mt-8">
-            <DemoChat characters={pub} mode="demo" />
+            <DemoChat characters={pub} pranks={pranks} mode="demo" />
           </div>
         </div>
       </section>

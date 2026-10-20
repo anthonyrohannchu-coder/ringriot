@@ -54,7 +54,7 @@ export default async function CallPage({ searchParams }: { searchParams: Promise
                 <div className="mt-5 flex flex-wrap gap-3">
                   {callsLive && <Link href="/pricing" className="sticker-sm press rounded-full bg-volt px-6 py-3 font-extrabold">See plans</Link>}
                   {chosen && canUse(plan, chosen.tier) && (
-                    <Link href={`/demo?c=${chosen.characterId}&s=${chosen.scenarioId}`} className="sticker-sm press rounded-full bg-ink px-6 py-3 font-extrabold text-volt">
+                    <Link href={`/demo?prank=${chosen.slug}`} className="sticker-sm press rounded-full bg-ink px-6 py-3 font-extrabold text-volt">
                       ▶ Try this prank in your browser
                     </Link>
                   )}
