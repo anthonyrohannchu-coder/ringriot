@@ -9,6 +9,7 @@ import { playPreview, stopPreview } from "@/lib/previewAudio";
 import type { CategoryId, Prank } from "@/lib/prankCategories";
 import { categories } from "@/lib/prankCategories";
 import { PrankArt } from "./PrankArt";
+import { pickStartPrank } from "@/lib/demoPick";
 
 type Turn = { role: "user" | "character"; text: string };
 type Mode = "demo" | "paid";
@@ -48,13 +49,7 @@ export function DemoChat({
   initialCharacterId?: string;
   initialScenarioId?: string;
 }) {
-  // In the free demo, a link to a Plus/Pro prank opens on a free one instead of a call that can't start.
-  const usable = (p: Prank) => mode !== "demo" || p.tier === "free";
-  const startPrank =
-    pranks.find((p) => usable(p) && p.characterId === initialCharacterId && p.scenarioId === initialScenarioId) ??
-    pranks.find((p) => usable(p) && p.characterId === initialCharacterId) ??
-    pranks.find(usable) ??
-    pranks[0];
+  const startPrank = pickStartPrank(pranks, mode, initialCharacterId, initialScenarioId);
   const [charId, setCharId] = useState(startPrank.characterId);
   const character = useMemo(() => characters.find((c) => c.id === charId)!, [characters, charId]);
   const [scenarioId, setScenarioId] = useState(startPrank.scenarioId);
