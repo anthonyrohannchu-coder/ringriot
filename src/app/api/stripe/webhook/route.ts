@@ -2,12 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { grantCredits } from "@/lib/credits";
+import { grantCredits, reserveCredits, settleCredits } from "@/lib/credits";
 import { creditPack, plans } from "@/config/plans";
 import { getPriceMap } from "@/lib/stripePrices";
 import {
   invoiceCustomerId, invoiceGrantKey, invoiceGrantsMonthlyCredits, invoicePlan, invoiceSubscriptionId,
-  invoiceUserId, isEntitled, isStaleSubscriptionEvent, packGrantKey, planForPrice, unmappedInvoicePrices,
+  invoiceUserId, isEntitled, isStaleSubscriptionEvent, packClawback, packClawbackKey, packGrantKey, planForPrice, unmappedInvoicePrices,
   type InvoiceLike,
 } from "@/lib/billing";
 
@@ -161,6 +161,21 @@ export async function POST(req: NextRequest) {
         const invId = (ch as unknown as { invoice?: string }).invoice;
         if (invId) {
           await db.from("referral_conversions").update({ status: "refunded", commission_cents: 0 }).eq("stripe_invoice_id", invId);
+        }
+        // Credit-pack refund: take back the unspent credits from that pack (subscriptions are cancelled in the portal).
+        const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id;
+        if (!invId && pi) {
+          const sessions = await stripe().checkout.sessions.list({ payment_intent: pi, limit: 1 });
+          const cs = sessions.data[0];
+          const userId = cs?.metadata?.user_id || cs?.client_reference_id;
+          if (cs && userId && cs.metadata?.product === "credits_25") {
+            const { data: bal } = await db.from("credit_balances").select("balance").eq("user_id", userId).maybeSingle();
+            const n = packClawback({ packCredits: creditPack.credits, amountPaidCents: ch.amount, amountRefundedCents: ch.amount_refunded, balance: bal?.balance ?? 0 });
+            if (n > 0) {
+              const r = await reserveCredits(userId, n, packClawbackKey(cs.id), "credit pack refunded");
+              if (r.ok && r.transaction_id) await settleCredits(r.transaction_id);
+            }
+          }
         }
         break;
       }
