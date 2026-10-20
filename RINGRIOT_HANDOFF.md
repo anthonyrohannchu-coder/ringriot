@@ -1,3 +1,15 @@
+# STATUS (Oct 20, 2026, 2 PM PT): PAUSED, NOT ABANDONED
+
+RingRiot is paused so the owner can focus on Chu Call Solutions. Nothing has been deleted.
+Full pause and restart guide (services, costs, open questions, restart steps):
+https://claude.ai/artifact/74v4ntzqNdoj4kukEG6kbn
+
+Facts as of the pause: 2 test accounts, 0 customers, 0 real calls, $0 revenue. Unmerged, tested PRs: #10, #11, #12.
+Never delete: this repo, Supabase project azfimpgjafvkkmsvceeq (free; resume within 1 year of auto-pause),
+Stripe account (shared with Nexor), Twilio account. Do not resume work without the owner's go-ahead.
+
+---
+
 # RingRiot handoff
 
 _Written 2026-10-20 00:30 PT by Claude (session https://claude.ai/code/session_01VCNApEn4DQM1hwZZviBJAC). No secrets in this file. Key values live only in Render and the provider dashboards._
