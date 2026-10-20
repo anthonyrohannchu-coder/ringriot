@@ -3,7 +3,7 @@ import { characters, publicCharacter } from "@/lib/characters";
 import { categories, featuredPranks, pranks } from "@/lib/pranks";
 import { DemoChat } from "@/components/DemoChat";
 import { PricingCards } from "@/components/PricingCards";
-import { CharacterFace } from "@/components/CharacterFace";
+import { PersonFace } from "@/components/PersonFace";
 import { PrankArt } from "@/components/PrankArt";
 import { PrankCard } from "@/components/PrankCard";
 import { brand } from "@/config/brand";
@@ -12,7 +12,7 @@ import { CALL_CREDIT_COST, twilioConfigured } from "@/lib/twilio";
 
 export default function Home() {
   const pub = characters.map(publicCharacter);
-  const quotes = characters.map((c) => ({ id: c.id, color: c.accent, line: c.exampleLine }));
+  const quotes = pranks.filter((p, i) => i % 3 === 0).map((p) => ({ id: p.slug, look: p.look, line: p.opener.split(/(?<=[.!?])\s/)[0] }));
   const callsLive = twilioConfigured();
   const faqs: [string, string][] = [
     [
@@ -75,7 +75,7 @@ export default function Home() {
         <div className="ticker gap-8">
           {[...quotes, ...quotes].map((q, i) => (
             <span key={i} className="flex shrink-0 items-center gap-3 pr-8 font-bold">
-              <CharacterFace id={q.id} color={q.color} size={28} />
+              <PersonFace look={q.look} size={28} />
               &ldquo;{q.line}&rdquo;
               <span className="text-volt">★</span>
             </span>

@@ -102,7 +102,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { data } = await supabaseAdmin()
     .from("call_requests")
-    .select("id, sender_name, character_id, status, turns, recording_sid, created_at, ended_at, expires_at, to_e164")
+    .select("id, sender_name, character_id, scenario_id, status, turns, recording_sid, created_at, ended_at, expires_at, to_e164")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(20);

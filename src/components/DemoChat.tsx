@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { PublicCharacter } from "@/lib/characters";
-import { CharacterFace } from "./CharacterFace";
+import { PersonFace } from "./PersonFace";
 import { Waveform } from "./Waveform";
 
 type Turn = { role: "user" | "character"; text: string };
@@ -119,9 +119,10 @@ export function DemoChat({
       if (!("speechSynthesis" in window)) return setSpeaking(false);
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text.replace(/\*[^*]{1,30}\*/g, ""));
-      u.voice = pickVoice(character.voice.browser.prefer) ?? null;
-      u.pitch = character.voice.browser.pitch;
-      u.rate = character.voice.browser.rate;
+      const bv = scenario.browserVoice ?? character.voice.browser;
+      u.voice = pickVoice(bv.prefer) ?? null;
+      u.pitch = bv.pitch;
+      u.rate = bv.rate;
       u.onend = () => setSpeaking(false);
       u.onerror = () => setSpeaking(false);
       window.speechSynthesis.speak(u);
@@ -232,7 +233,7 @@ export function DemoChat({
                   className={`sticker-sm relative min-w-[118px] rounded-2xl p-3 text-left transition ${active ? "-rotate-2 scale-[1.03]" : "press"} ${locked(c) ? "cursor-not-allowed opacity-60" : ""}`}
                   style={{ background: active ? c.accent : "#fff" }}
                 >
-                  <CharacterFace id={c.id} color={c.accent} size={48} />
+                  {c.scenarios[0].look ? <PersonFace look={c.scenarios[0].look} size={48} /> : null}
                   <div className="mt-1 text-sm font-extrabold leading-tight">{c.name}</div>
                   <div className="text-[11px] font-medium leading-tight text-ink/70">{c.archetype.replace("The ", "")}</div>
                   {locked(c) && (
@@ -304,7 +305,7 @@ export function DemoChat({
                 <div>
                   <p className="label">{declines ? "calling again…" : "incoming call…"}</p>
                   <div className="ring mx-auto mt-6 w-fit">
-                    <CharacterFace id={character.id} color={accent} size={150} />
+                    {scenario.look && <PersonFace look={scenario.look} size={150} />}
                   </div>
                   <h3 className="mt-4 text-3xl leading-none">{character.name}</h3>
                   <p className="mt-2 font-semibold text-ink/70">{scenario.title}</p>
@@ -331,7 +332,7 @@ export function DemoChat({
               <>
                 <div className="flex items-center justify-between gap-2 border-b-[3px] border-ink px-4 pb-3 pt-10" style={{ background: accent }}>
                   <div className="flex items-center gap-2.5">
-                    <CharacterFace id={character.id} color={accent} size={46} talking={speaking} />
+                    {scenario.look && <PersonFace look={scenario.look} size={46} talking={speaking} />}
                     <div>
                       <div className="font-extrabold leading-tight">{character.name}</div>
                       <div className="flex items-center gap-1.5 text-xs font-bold">

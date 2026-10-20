@@ -2,7 +2,7 @@
 // the prank's icon in a big sticker badge, and the voice's face peeking from the corner.
 import type { CategoryId, Prank } from "@/lib/prankCategories";
 import { categoryOf } from "@/lib/prankCategories";
-import { CharacterFace } from "./CharacterFace";
+import { PersonFace } from "./PersonFace";
 
 const INK = "#17121a";
 
@@ -32,7 +32,7 @@ function Doodles({ category }: { category: CategoryId }) {
   );
 }
 
-export function PrankArt({ prank, size = "md", face: showFace = true }: { prank: Pick<Prank, "category" | "icon" | "characterId" | "accent">; size?: "sm" | "md" | "lg"; face?: boolean }) {
+export function PrankArt({ prank, size = "md", face: showFace = true }: { prank: Pick<Prank, "category" | "icon" | "look">; size?: "sm" | "md" | "lg"; face?: boolean }) {
   const cat = categoryOf(prank.category);
   const h = size === "lg" ? "h-56" : size === "sm" ? "h-24" : "h-36";
   const badge = size === "lg" ? "h-28 w-28 text-6xl" : size === "sm" ? "h-14 w-14 text-3xl" : "h-20 w-20 text-5xl";
@@ -45,7 +45,7 @@ export function PrankArt({ prank, size = "md", face: showFace = true }: { prank:
       </div>
       {showFace && (
         <div className="absolute -bottom-2 right-2 rotate-6" aria-hidden>
-          <CharacterFace id={prank.characterId} color={prank.accent} size={face} />
+          <PersonFace look={prank.look} size={face} />
         </div>
       )}
     </div>
