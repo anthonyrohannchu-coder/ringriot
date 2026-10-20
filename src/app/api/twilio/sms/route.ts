@@ -2,27 +2,40 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { reserveCredits } from "@/lib/credits";
 import { brand } from "@/config/brand";
 import { CALL_CREDIT_COST, hashNumber, normalizeNumber, readTwilioForm, startCall, twiml, xml } from "@/lib/twilio";
+import { parseReply } from "@/lib/consent";
 
-// Replies from friends: YES places the call, STOP/NO blocks the number forever.
+// Replies from friends: YES places the waiting call and gives standing consent for that sender;
+// "YES <code>" (from an invite link) opts in to a sender's future pranks; STOP/NO blocks the number forever.
 export async function POST(req: Request) {
   const { params, ok } = await readTwilioForm(req);
   if (!ok) return new Response("forbidden", { status: 403 });
 
   const from = normalizeNumber(params.From ?? "");
-  const body = (params.Body ?? "").trim().toUpperCase();
+  const reply = parseReply(params.Body ?? "");
   if (!from) return twiml("");
   const toHash = hashNumber(from);
   const db = supabaseAdmin();
 
-  if (/^(STOP|STOPALL|UNSUBSCRIBE|CANCEL|END|QUIT|NO|BLOCK)\b/.test(body)) {
+  if (reply.kind === "stop") {
     await db.from("blocked_numbers").upsert({ to_hash: toHash });
     await db.from("call_requests").update({ status: "declined", to_e164: null }).eq("to_hash", toHash).eq("status", "awaiting_consent");
     // Twilio sends its own STOP confirmation; reply only for NO/BLOCK.
-    return twiml(/^(NO|BLOCK)/.test(body) ? `<Message>Got it. You won't get ${xml(brand.name)} calls or texts again.</Message>` : "");
+    return twiml(/^(NO|BLOCK)/.test(reply.word) ? `<Message>Got it. You won't get ${xml(brand.name)} calls or texts again.</Message>` : "");
   }
 
-  if (!/^(YES|Y|YEA|YEAH|YEP|OK|OKAY|SURE)\b/.test(body)) {
+  if (reply.kind !== "yes") {
     return twiml(`<Message>Reply YES to get your prank call, or STOP to block ${xml(brand.name)}.</Message>`);
+  }
+
+  // Invite opt-in: "YES <code>" from the sender's invite link.
+  let invited = false;
+  if (reply.code) {
+    const { data: ref } = await db.from("referral_codes").select("user_id").eq("code", reply.code).maybeSingle();
+    if (ref) {
+      invited = true;
+      await db.from("blocked_numbers").delete().eq("to_hash", toHash); // an explicit new opt-in overrides an old STOP
+      await db.from("consent_records").insert({ user_id: ref.user_id, kind: "standing_invite", recipient_hash: toHash });
+    }
   }
 
   const { data: request } = await db
@@ -34,11 +47,13 @@ export async function POST(req: Request) {
     .limit(1)
     .maybeSingle();
   if (!request || !request.to_e164 || new Date(request.expires_at) < new Date()) {
+    if (reply.code && !invited) return twiml(`<Message>That invite code didn't work. Ask your friend for their RingRiot invite link again.</Message>`);
+    if (invited) return twiml(`<Message>You're in! Your friend's ${xml(brand.name)} pranks will now ring you directly. Reply STOP anytime to block them.</Message>`);
     return twiml("<Message>That prank call expired. Ask your friend to send a new one!</Message>");
   }
 
-  // Consent on record before anything rings.
-  await db.from("consent_records").insert({ user_id: request.user_id, kind: "recipient_sms_yes", recipient_hash: toHash });
+  // Consent on record before anything rings. The consent text says YES also covers this sender's future pranks.
+  await db.from("consent_records").insert({ user_id: request.user_id, kind: "standing_yes", recipient_hash: toHash });
 
   const r = await reserveCredits(request.user_id, CALL_CREDIT_COST, `call:${request.id}`, "real phone call");
   if (!r.ok) {

@@ -71,3 +71,20 @@ test("preview text, URL and voice choice", () => {
   assert.notEqual(a, b, "rotates between equally good voices");
   assert.ok(voiceSettingsFor({ gender: "m", age: "adult", delivery: "panicking" }).stability < voiceSettingsFor({ gender: "m", age: "adult", delivery: "deadpan" }).stability);
 });
+
+test("consent replies and wording", async () => {
+  const { parseReply, consentText, inviteSmsHref, STANDING_KINDS } = await import("../src/lib/consent");
+  assert.deepEqual(parseReply("yes"), { kind: "yes", code: null });
+  assert.deepEqual(parseReply("  Yes AB12CD34!"), { kind: "yes", code: "ab12cd34" });
+  assert.deepEqual(parseReply("yeah lol"), { kind: "yes", code: null });
+  assert.equal(parseReply("STOP").kind, "stop");
+  assert.equal(parseReply("no thanks").kind, "stop");
+  assert.equal(parseReply("who is this").kind, "other");
+  const t = consentText({ senderName: "Anthony", characterName: "Sal", archetype: "Lost Pizza Guy", brand: "RingRiot" });
+  assert.match(t, /AI comedy character/);
+  assert.match(t, /recorded/);
+  assert.match(t, /future pranks from Anthony will then ring you directly/, "the YES must say it covers future pranks");
+  assert.match(t, /STOP/);
+  assert.equal(inviteSmsHref("+12084438421", "ab12cd34"), "sms:+12084438421?&body=YES%20AB12CD34");
+  assert.ok(!(STANDING_KINDS as readonly string[]).includes("recipient_sms_yes"), "old one-off YES rows don't count as standing consent");
+});

@@ -52,7 +52,7 @@ export function firstBlockingStep(s: WizardState): WizardStep | null {
 
 export const TRACK_STEPS = [
   { id: "sent", label: "Text sent", hint: "Your friend got the heads-up text." },
-  { id: "yes", label: "They said YES", hint: "Their phone only rings after they reply YES." },
+  { id: "yes", label: "They said YES", hint: "One YES, one time. After this your pranks ring them directly." },
   { id: "ringing", label: "Ringing", hint: "Calling from your Prank Caller Number." },
   { id: "live", label: "On the call", hint: "The character is talking to them right now." },
   { id: "done", label: "Done", hint: "Recording and results below." },

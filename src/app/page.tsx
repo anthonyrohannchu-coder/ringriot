@@ -18,7 +18,7 @@ export default function Home() {
     [
       "Is it a real phone call?",
       callsLive
-        ? `Yes, on Plus and Pro. Your friend gets a text first, and their phone only rings if they reply YES. You can also try any prank free in your browser.`
+        ? `Yes, on Plus and Pro. Your friend opts in once (one YES text, or your invite link), and after that your pranks ring them as a surprise. You can also try any prank free in your browser.`
         : `Real phone calls are switching on soon for Plus and Pro, and they'll only ring friends who reply YES first. Right now you can try every free prank in your browser.`,
     ],
     ["Does my friend know it's AI?", "Yes. Every call opens with a quick notice that it's an AI comedy call and that it's recorded. If they ask \"are you a robot?\", the character admits it. Saying \"stop\" ends the call right away."],
@@ -129,7 +129,7 @@ export default function Home() {
             {[
               ["Pick a prank", "A fake lottery win, an ex at 2 a.m., a car named Bernadette. All original, all silly."],
               ["Add your friend", "Enter their number and your name. Choose which RingRiot number calls them."],
-              ["They text YES", "Your friend gets a heads-up text. Their phone only rings if they agree."],
+              ["They opt in once", "One YES text or your invite link. After that, every prank rings them as a surprise."],
               ["Listen back", "The character talks to them live and reacts to what they say. You get the recording."],
             ].map(([t, d], i) => (
               <li key={t} className={`sticker rounded-3xl bg-panel p-6 ${i % 2 ? "md:rotate-1" : "md:-rotate-1"}`}>
@@ -159,7 +159,7 @@ export default function Home() {
           <h2 className="text-4xl md:text-5xl">Funny, not mean.</h2>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["✋", "They opt in", "No YES, no call. Your friend can reply STOP anytime to block every future call."],
+              ["✋", "They opt in", "Friends say YES once before the first call. They can text STOP anytime to block every future call."],
               ["🤖", "Always says it's AI", "Each call opens with an AI and recording notice, and the character admits it if asked."],
               ["🛑", "\"Stop\" means stop", "Saying stop or hanging up ends it immediately. Credits come back if they don't pick up."],
               ["🧼", "Clean comedy", "No threats, no fake officials, no stereotypes or accents, no asking for personal info."],

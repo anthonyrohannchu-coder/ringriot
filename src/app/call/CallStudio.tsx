@@ -50,6 +50,9 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
   const [calls, setCalls] = useState<Call[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [trackId, setTrackId] = useState<string | null>(null);
+  const [directIds, setDirectIds] = useState<string[]>([]);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/calls", { cache: "no-store" });
@@ -57,6 +60,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
     const data = await r.json();
     setCalls(data.calls);
     if (typeof data.credits === "number") setCredits(data.credits);
+    if (typeof data.inviteUrl === "string") setInviteUrl(data.inviteUrl);
     const numbers = Array.isArray(data.callerNumbers) ? (data.callerNumbers as string[]) : [];
     setCallerNumbers(numbers);
     setCallerNumber((current) => (current && numbers.includes(current) ? current : numbers.length === 1 ? numbers[0] : ""));
@@ -116,6 +120,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
         return;
       }
       setTrackId(d.id);
+      if (d.direct) setDirectIds((ids) => [...ids, d.id]);
       await load();
     } catch {
       setError("Network error. Try again.");
@@ -140,7 +145,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
     <div className="grid items-start gap-8 lg:grid-cols-[1fr_360px]">
       <div className="sticker rounded-3xl bg-panel p-5 md:p-6">
         {trackId ? (
-          <Tracker call={tracked} prank={prank} cost={CALL_COST} credits={credits} callerNumber={callerNumber} onAgain={startOver} />
+          <Tracker call={tracked} prank={prank} cost={CALL_COST} credits={credits} callerNumber={callerNumber} direct={!!trackId && directIds.includes(trackId)} onAgain={startOver} />
         ) : (
           <>
             {/* Stepper */}
@@ -220,7 +225,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
             {step === "friend" && (
               <div className="rise">
                 <h2 className="text-2xl">Friend Number</h2>
-                <p className="mt-1 font-semibold text-ink/70">The number that gets the prank. They&apos;ll get a text first and only get called if they reply YES.</p>
+                <p className="mt-1 font-semibold text-ink/70">The number that gets the prank. The first time, they get a text and reply YES once. After that, your pranks ring them directly.</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-[170px_1fr]">
                   <label className="block">
                     <span className="label">Country</span>
@@ -241,6 +246,16 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
                 {touched && problem ? <p className="mt-2 text-sm font-bold text-nope">{problem}</p>
                   : e164 ? <p className="mt-2 text-sm font-bold text-go">✓ {formatNumber(e164)} looks good</p> : null}
                 <p className="mt-3 text-xs font-semibold text-ink/60">Only US and Canadian numbers can be called right now. No toll-free, premium or emergency numbers.</p>
+                {inviteUrl && (
+                  <div className="mt-4 rounded-2xl border-2 border-dashed border-ink/30 p-3">
+                    <p className="text-sm font-extrabold">Want it to ring with no heads-up text?</p>
+                    <p className="mt-1 text-xs font-semibold text-ink/70">Send your friend your invite link from your own phone. Once they opt in (one text, one time), every prank you send rings them right away. If they&apos;ve said YES to you before, it already will.</p>
+                    <button type="button" onClick={() => { navigator.clipboard?.writeText(inviteUrl).then(() => setCopied(true), () => setCopied(false)); }}
+                      className="sticker-sm press mt-2 rounded-full bg-panel px-3 py-1.5 text-xs font-extrabold">
+                      {copied ? "✓ Copied" : "🔗 Copy invite link"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -301,7 +316,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
                   ))}
                   <div className="flex items-center justify-between gap-3 px-4 py-3">
                     <dt className="label">Cost</dt>
-                    <dd className="text-right font-extrabold">{CALL_COST} credits <span className="block text-xs font-bold text-ink/60">You have {credits}. Only charged if they say YES, refunded if they don&apos;t pick up.</span></dd>
+                    <dd className="text-right font-extrabold">{CALL_COST} credits <span className="block text-xs font-bold text-ink/60">You have {credits}. Refunded if they don&apos;t pick up. If they&apos;ve opted in before it rings right away; otherwise they get a YES text first.</span></dd>
                   </div>
                 </dl>
                 {problem && <p className="sticker-sm mt-3 rounded-2xl bg-volt p-3 text-sm font-bold">{problem} <Link href="/pricing" className="underline">Get credits</Link></p>}
@@ -320,7 +335,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
               ) : (
                 <button type="button" onClick={send} disabled={busy || !!firstBlockingStep(state)}
                   className="sticker press flex-1 rounded-full bg-ink py-3.5 text-lg font-extrabold text-volt disabled:opacity-50">
-                  {busy ? "Sending…" : `📞 Send the YES text`}
+                  {busy ? "Sending…" : `📞 Send the prank`}
                 </button>
               )}
             </div>
@@ -353,7 +368,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits: initialCredits,
   );
 }
 
-function Tracker({ call, prank, cost, credits, callerNumber, onAgain }: { call?: Call; prank: Prank; cost: number; credits: number; callerNumber: string; onAgain: (keepFriend: boolean) => void }) {
+function Tracker({ call, prank, cost, credits, callerNumber, direct, onAgain }: { call?: Call; prank: Prank; cost: number; credits: number; callerNumber: string; direct: boolean; onAgain: (keepFriend: boolean) => void }) {
   if (!call) return <p className="font-bold">Loading your call…</p>;
   const { reached, stoppedAt } = trackProgress(call.status);
   const final = isFinal(call.status);
@@ -376,8 +391,8 @@ function Tracker({ call, prank, cost, credits, callerNumber, onAgain }: { call?:
             <li key={s.id} className={`flex items-start gap-3 ${done || now ? "" : "opacity-40"}`}>
               <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-ink text-sm font-extrabold ${done ? "bg-go text-white" : now ? "bg-volt animate-pulse" : "bg-white"}`}>{done ? "✓" : i + 1}</span>
               <div>
-                <p className="font-extrabold">{s.label}{now && "…"}</p>
-                <p className="text-sm font-semibold text-ink/60">{s.hint}</p>
+                <p className="font-extrabold">{direct && i < 2 ? (i === 0 ? "No text needed" : "Already opted in") : s.label}{now && "…"}</p>
+                <p className="text-sm font-semibold text-ink/60">{direct && i < 2 ? "They said YES to your pranks before." : s.hint}</p>
               </div>
             </li>
           );

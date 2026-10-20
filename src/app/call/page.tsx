@@ -29,7 +29,7 @@ export default async function CallPage({ searchParams }: { searchParams: Promise
         <p className="sticker-sm inline-block -rotate-2 rounded-full bg-hot px-3 py-1 label">real phone call</p>
         <h1 className="mt-4 text-4xl md:text-6xl">Send a prank call.</h1>
         <p className="mt-3 max-w-2xl text-lg font-semibold text-ink/70">
-          Your friend gets a text, replies YES, and their phone rings. The AI character talks to them live, and you get the recording. {CALL_CREDIT_COST} credits per call.
+          Your friend opts in once, and after that your pranks ring them as a surprise. The AI character talks to them live, and you get the recording. {CALL_CREDIT_COST} credits per call.
         </p>
 
         <div className="mt-8">

@@ -3,9 +3,11 @@ import { z } from "zod";
 import { getUser, supabaseAdmin } from "@/lib/supabase/server";
 import { findScenario, getCharacter } from "@/lib/characters";
 import { brand } from "@/config/brand";
+import { STANDING_KINDS, consentText } from "@/lib/consent";
+import { refundCredits, reserveCredits } from "@/lib/credits";
 import {
   CALL_CREDIT_COST, RECIPIENT_REQUESTS_PER_DAY, USER_REQUESTS_PER_DAY,
-  configuredCallerNumbers, ensureNumberWebhook, hashNumber, isAllowedCallerNumber, normalizeNumber, sendSms, twilioConfigured, withinQuietHours,
+  configuredCallerNumbers, ensureNumberWebhook, hashNumber, isAllowedCallerNumber, normalizeNumber, sendSms, startCall, twilioConfigured, withinQuietHours,
 } from "@/lib/twilio";
 
 const Body = z.object({
@@ -63,11 +65,13 @@ export async function POST(req: NextRequest) {
 
   const toHash = hashNumber(to);
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const [{ data: blocked }, { count: mine }, { count: theirs }, { data: pending }] = await Promise.all([
+  const [{ data: blocked }, { count: mine }, { count: theirs }, { data: pending }, { data: standing }] = await Promise.all([
     db.from("blocked_numbers").select("to_hash").eq("to_hash", toHash).maybeSingle(),
     db.from("call_requests").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since),
     db.from("call_requests").select("id", { count: "exact", head: true }).eq("to_hash", toHash).gte("created_at", since),
     db.from("call_requests").select("id").eq("to_hash", toHash).eq("status", "awaiting_consent").gt("expires_at", new Date().toISOString()).limit(1),
+    // Has this friend already said YES to this sender's pranks (by text or invite link)?
+    db.from("consent_records").select("id").eq("user_id", user.id).eq("recipient_hash", toHash).in("kind", [...STANDING_KINDS]).limit(1),
   ]);
   if (blocked) return NextResponse.json({ error: "blocked", message: "That number has opted out of RingRiot calls." }, { status: 403 });
   if ((mine ?? 0) >= USER_REQUESTS_PER_DAY) return NextResponse.json({ error: "daily_cap", message: "You've hit today's limit for real calls." }, { status: 429 });
@@ -81,14 +85,29 @@ export async function POST(req: NextRequest) {
     .single();
   if (error || !request) return NextResponse.json({ error: "server_error" }, { status: 500 });
 
+  // Friend already opted in to this sender's pranks: ring right away, no text.
+  if (standing?.length) {
+    const r = await reserveCredits(user.id, CALL_CREDIT_COST, `call:${request.id}`, "real phone call");
+    if (!r.ok) {
+      await db.from("call_requests").update({ status: "failed", to_e164: null }).eq("id", request.id);
+      return NextResponse.json({ error: "no_credits", message: `A real call needs ${CALL_CREDIT_COST} credits.` }, { status: 402 });
+    }
+    try {
+      await ensureNumberWebhook(callerNumber);
+      const call = await startCall(to, request.id, callerNumber);
+      await db.from("call_requests").update({ status: "calling", consented_at: new Date().toISOString(), credit_tx_id: r.transaction_id, twilio_call_sid: call.sid }).eq("id", request.id);
+      return NextResponse.json({ ok: true, id: request.id, direct: true });
+    } catch (err) {
+      console.error("direct call failed", err);
+      if (r.transaction_id) await refundCredits(r.transaction_id, "call failed to start");
+      await db.from("call_requests").update({ status: "failed", to_e164: null }).eq("id", request.id);
+      return NextResponse.json({ error: "call_failed", message: "Couldn't start the call. No credits were used." }, { status: 502 });
+    }
+  }
+
   try {
     await ensureNumberWebhook(callerNumber);
-    await sendSms(
-      to,
-      `${senderName} sent you a prank call from ${character.name} (${character.archetype}), an AI comedy character on ${brand.name}. ` +
-        `The call is recorded and may be shared by ${senderName}. Reply YES to get it now. Reply STOP to never get ${brand.name} texts or calls.`,
-      callerNumber,
-    );
+    await sendSms(to, consentText({ senderName, characterName: character.name, archetype: character.archetype, brand: brand.name }), callerNumber);
   } catch (err) {
     console.error("sms failed", err);
     await db.from("call_requests").update({ status: "failed", to_e164: null }).eq("id", request.id);
@@ -116,6 +135,12 @@ export async function GET() {
     hasRecording: !!c.recording_sid,
     recording_sid: undefined,
   }));
-  const { data: bal } = await supabaseAdmin().from("credit_balances").select("balance").eq("user_id", user.id).single();
-  return NextResponse.json({ calls, callerNumbers: configuredCallerNumbers(), credits: bal?.balance ?? null, cost: CALL_CREDIT_COST });
+  const [{ data: bal }, { data: ref }] = await Promise.all([
+    supabaseAdmin().from("credit_balances").select("balance").eq("user_id", user.id).single(),
+    supabaseAdmin().from("referral_codes").select("code").eq("user_id", user.id).maybeSingle(),
+  ]);
+  return NextResponse.json({
+    calls, callerNumbers: configuredCallerNumbers(), credits: bal?.balance ?? null, cost: CALL_CREDIT_COST,
+    inviteUrl: ref?.code ? `${brand.appUrl}/invite/${ref.code}` : null,
+  });
 }
