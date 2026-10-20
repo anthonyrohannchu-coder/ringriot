@@ -13,20 +13,20 @@ export async function Nav() {
             <span className="display">{brand.name}</span>
           </Link>
           <nav className="hidden items-center gap-6 font-bold md:flex">
-            <Link href="/#cast" className="hover:underline decoration-[3px] underline-offset-4">The cast</Link>
-            <Link href="/call" className="hover:underline decoration-[3px] underline-offset-4">📞 Real call</Link>
+            <Link href="/pranks" className="hover:underline decoration-[3px] underline-offset-4">Pranks</Link>
+            <Link href="/#demo" className="hover:underline decoration-[3px] underline-offset-4">Try free</Link>
             <Link href="/pricing" className="hover:underline decoration-[3px] underline-offset-4">Pricing</Link>
             <Link href={user ? "/dashboard" : "/login"} className="hover:underline decoration-[3px] underline-offset-4">{user ? "My stuff" : "Log in"}</Link>
-            <Link href="/#demo" className="sticker-sm press rounded-full bg-panel px-5 py-2">Try it free</Link>
+            <Link href="/call" className="sticker-sm press rounded-full bg-ink px-5 py-2 text-volt">📞 Send a prank</Link>
           </nav>
-          <Link href="/#demo" className="sticker-sm rounded-full bg-panel px-4 py-1.5 text-sm font-bold md:hidden">Try free</Link>
+          <Link href="/call" className="sticker-sm rounded-full bg-ink px-4 py-1.5 text-sm font-bold text-volt md:hidden">📞 Send a prank</Link>
         </div>
       </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t-[3px] border-ink bg-panel pb-[env(safe-area-inset-bottom)] md:hidden">
         {[
           ["/", "⌂", "Home"],
-          ["/call", "☎", "Real call"],
+          ["/pranks", "☎", "Pranks"],
           ["/pricing", "★", "Plans"],
           [user ? "/dashboard" : "/login", "☺", user ? "Me" : "Log in"],
         ].map(([href, icon, label]) => (

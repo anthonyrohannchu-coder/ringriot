@@ -34,16 +34,20 @@ export function DemoChat({
   characters,
   mode,
   initialCharacterId,
+  initialScenarioId,
   premiumVoice = false,
 }: {
   characters: PublicCharacter[];
   mode: Mode;
   initialCharacterId?: string;
+  initialScenarioId?: string;
   premiumVoice?: boolean;
 }) {
   const [charId, setCharId] = useState(initialCharacterId ?? characters[0].id);
   const character = useMemo(() => characters.find((c) => c.id === charId)!, [characters, charId]);
-  const [scenarioId, setScenarioId] = useState(character.scenarios[0].id);
+  const [scenarioId, setScenarioId] = useState(
+    initialScenarioId && character.scenarios.some((s) => s.id === initialScenarioId) ? initialScenarioId : character.scenarios[0].id,
+  );
   const scenario = character.scenarios.find((s) => s.id === scenarioId) ?? character.scenarios[0];
 
   const [turns, setTurns] = useState<Turn[]>([]);
