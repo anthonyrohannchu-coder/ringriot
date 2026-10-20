@@ -14,7 +14,7 @@ export function PrankLibrary({ pranks, initialCategory }: { pranks: Prank[]; ini
 
   const shown = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    const label = (id: CategoryId) => categories.find((c) => c.id === id)!.label.toLowerCase();
+    const label = (id: CategoryId) => { const c = categories.find((x) => x.id === id)!; return `${c.label} ${c.keywords}`.toLowerCase(); };
     const list = pranks.filter((p) => {
       if (cat !== "all" && p.category !== cat) return false;
       const hay = `${p.title} ${p.blurb} ${label(p.category)}`.toLowerCase();
@@ -54,7 +54,7 @@ export function PrankLibrary({ pranks, initialCategory }: { pranks: Prank[]; ini
         </label>
       </div>
 
-      <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-2" role="group" aria-label="Categories">
+      <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-2 md:mx-0 md:flex-wrap md:overflow-visible md:px-0" role="group" aria-label="Categories">
         <button type="button" className={chip(cat === "all")} aria-pressed={cat === "all"} onClick={() => setCat("all")}>All · {pranks.length}</button>
         {categories.map((c) => (
           <button type="button" key={c.id} className={chip(cat === c.id)} aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>
