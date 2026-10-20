@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { refundCredits, settleCredits } from "@/lib/credits";
 import { readTwilioForm } from "@/lib/twilio";
+import { track } from "@/lib/events";
+import { estimateCallCostUsd } from "@/lib/metrics";
 
 // Call lifecycle + recording-ready callbacks from Twilio.
 export async function POST(req: Request) {
@@ -28,9 +30,12 @@ export async function POST(req: Request) {
   if (status === "completed") {
     const answered = r.status === "in_progress";
     await db.from("call_requests").update({ status: answered ? "completed" : "no_answer", ended_at: new Date().toISOString(), to_e164: null }).eq("id", r.id);
+    const seconds = Number(params.CallDuration ?? 0) || 0;
+    await track("call_completed", { userId: r.user_id, props: { answered, seconds, est_cost_usd: answered ? estimateCallCostUsd(seconds) : 0 } });
     if (r.credit_tx_id) answered ? await settleCredits(r.credit_tx_id) : await refundCredits(r.credit_tx_id, "not answered");
   } else if (["busy", "no-answer", "failed", "canceled"].includes(status)) {
     await db.from("call_requests").update({ status: status === "failed" ? "failed" : "no_answer", ended_at: new Date().toISOString(), to_e164: null }).eq("id", r.id);
+    await track("call_completed", { userId: r.user_id, props: { answered: false, seconds: 0, est_cost_usd: 0, outcome: status } });
     if (r.credit_tx_id) await refundCredits(r.credit_tx_id, `call ${status}`);
   }
   return NextResponse.json({ ok: true });

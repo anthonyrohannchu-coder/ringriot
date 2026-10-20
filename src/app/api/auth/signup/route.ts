@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { track } from "@/lib/events";
 
 // Creates an account without sending any email (no email rate limits, no redirect setup).
 // The browser then signs in with the same email + password.
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad_request", message: "Enter a valid email and a password of at least 8 characters." }, { status: 400 });
   }
   const ref = req.cookies.get("rr_ref")?.value;
-  const { error } = await supabaseAdmin().auth.admin.createUser({
+  const { data: created, error } = await supabaseAdmin().auth.admin.createUser({
     email: parsed.data.email.toLowerCase(),
     password: parsed.data.password,
     email_confirm: true,
@@ -30,7 +31,10 @@ export async function POST(req: NextRequest) {
         password: parsed.data.password,
         email_confirm: true,
       });
-      if (!upd) return NextResponse.json({ ok: true, claimed: true });
+      if (!upd) {
+        await track("signup", { userId: unusedId as string, ref: ref ?? null, props: { claimed: true } });
+        return NextResponse.json({ ok: true, claimed: true });
+      }
       console.error("claim failed", upd.message);
     }
   }
@@ -42,5 +46,6 @@ export async function POST(req: NextRequest) {
       { status: exists ? 409 : 500 },
     );
   }
+  await track("signup", { userId: created?.user?.id ?? null, ref: ref ?? null });
   return NextResponse.json({ ok: true });
 }
