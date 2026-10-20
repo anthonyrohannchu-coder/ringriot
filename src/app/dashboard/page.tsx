@@ -105,6 +105,11 @@ export default async function Dashboard() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="sticker rounded-3xl bg-panel p-5">
+            <h2 className="text-lg font-bold">Invite link</h2>
+            <p className="mt-1 text-sm text-ink/70">Send it to friends from your own phone. Once they opt in, your pranks ring them directly, with no heads-up text.</p>
+            {ref && <code className="mt-3 block break-all rounded-xl bg-paper p-3 text-sm font-bold border-2 border-dashed border-ink">{brand.appUrl}/invite/{ref.code}</code>}
+          </div>
+          <div className="sticker rounded-3xl bg-panel p-5">
             <h2 className="text-lg font-bold">Creator link</h2>
             <p className="mt-1 text-sm text-ink/70">Share it. You earn {Math.round(Number(ref?.commission_rate ?? 0.3) * 100)}% of every paid month from people who sign up through it.</p>
             {ref && <code className="mt-3 block break-all rounded-xl bg-paper p-3 text-sm font-bold border-2 border-dashed border-ink">{brand.appUrl}/r/{ref.code}</code>}
