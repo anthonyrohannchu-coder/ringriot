@@ -19,6 +19,7 @@ const pages: Record<string, { title: string; body: string[] }> = {
       "We collect your email (to log you in), your plan and credit history, and conversation transcripts only if you keep 'Save transcripts' on.",
       "Transcripts auto-delete after the retention period you choose (default 30 days). You can delete any conversation or your whole account at any time.",
       "Payments are processed by Stripe; we never see or store your full card number.",
+      "We count page visits and key steps (sign-up, checkout, calls) with our own first-party analytics and a random anonymous ID cookie. No advertising trackers, and no phone numbers are stored in analytics.",
       "Conversation text is sent to our AI provider to generate replies. We do not sell personal data.",
       `Questions or deletion requests: ${brand.supportEmail}.`,
     ],

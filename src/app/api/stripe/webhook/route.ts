@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { track } from "@/lib/events";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
         const s = event.data.object as Stripe.Checkout.Session;
         const userId = s.metadata?.user_id || s.client_reference_id;
         if (!userId) break;
+        if (s.payment_status === "paid") {
+          await track("purchase", { userId, ref: s.metadata?.ref || null, props: { mode: s.mode, product: s.metadata?.product ?? null, amount_usd: (s.amount_total ?? 0) / 100 } });
+        }
         if (s.mode === "payment" && s.payment_status === "paid" && s.metadata?.product === "credits_25") {
           if (!(await profileExists(userId))) break;
           await grantCredits(userId, creditPack.credits, packGrantKey(s.id), "credit pack purchase");
@@ -81,6 +85,7 @@ export async function POST(req: NextRequest) {
         const item = sub.items.data[0];
         const priceId = item?.price?.id ?? null;
         const deleted = event.type === "customer.subscription.deleted";
+        if (deleted) await track("subscription_canceled", { userId, props: { plan: sub.metadata?.plan ?? null, subscription: sub.id } });
         const entitled = !deleted && isEntitled(sub.status);
         const plan = planForPrice(await getPriceMap(), priceId);
         if (entitled && !plan) {
@@ -158,6 +163,7 @@ export async function POST(req: NextRequest) {
 
       case "charge.refunded": {
         const ch = event.data.object as Stripe.Charge;
+        await track("refund", { props: { amount_usd: (ch.amount_refunded ?? 0) / 100, charge: ch.id } });
         const invId = (ch as unknown as { invoice?: string }).invoice;
         if (invId) {
           await db.from("referral_conversions").update({ status: "refunded", commission_cents: 0 }).eq("stripe_invoice_id", invId);

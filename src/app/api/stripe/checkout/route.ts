@@ -1,4 +1,5 @@
 import { usableCustomerId } from "@/lib/stripeCustomer";
+import { track } from "@/lib/events";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { stripe, stripeConfigured } from "@/lib/stripe";
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
       success_url: `${brand.appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${brand.appUrl}/checkout/canceled`,
     });
+    await track("checkout_started", { userId: user.id, ref: profile?.referred_by_code ?? null, props: { product } });
     return NextResponse.json({ url: session.url });
   } catch (err) {
     console.error("checkout failed", err);
