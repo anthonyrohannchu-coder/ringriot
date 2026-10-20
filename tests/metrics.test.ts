@@ -54,3 +54,26 @@ test("only whitelisted client events; bots ignored", () => {
   assert.equal(isBot(null), true);
   assert.equal(isBot("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)"), false);
 });
+
+test("stored page paths drop query strings and invite/referral codes", async () => {
+  const { cleanPath } = await import("../src/lib/metrics");
+  assert.equal(cleanPath("/invite/56120671"), "/invite/:code");
+  assert.equal(cleanPath("/r/aliza?x=1"), "/r/:code");
+  assert.equal(cleanPath("/call?prank=sal-hit-my-car#top"), "/call");
+  assert.equal(cleanPath("https://evil.example/x"), null);
+  assert.equal(cleanPath(42), null);
+  assert.equal(cleanPath("/" + "a".repeat(300))!.length, 100);
+});
+
+test("no analytics event stores phone numbers, names or Stripe ids", async () => {
+  const { readFileSync, readdirSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const files: string[] = [];
+  const walk = (d: string) => { for (const f of readdirSync(d)) { const p = join(d, f); statSync(p).isDirectory() ? walk(p) : p.endsWith(".ts") && files.push(p); } };
+  walk(new URL("../src/app", import.meta.url).pathname);
+  const calls = files.flatMap((f) => readFileSync(f, "utf8").split("\n").filter((l) => /\btrack\(/.test(l)));
+  assert.ok(calls.length >= 7, "all tracking calls found");
+  for (const line of calls) {
+    assert.doesNotMatch(line, /e164|phone|\bto\b|sender_?[nN]ame|email|\b(ch|sub|s|inv|cs)\.id\b|charge|subscription:/, line.trim());
+  }
+});

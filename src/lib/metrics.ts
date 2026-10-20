@@ -4,6 +4,15 @@ export const CLIENT_EVENTS = ["page_view", "demo_started", "pricing_view"] as co
 export type ClientEvent = (typeof CLIENT_EVENTS)[number];
 export const isClientEvent = (n: unknown): n is ClientEvent => typeof n === "string" && (CLIENT_EVENTS as readonly string[]).includes(n);
 
+/**
+ * Page path safe to store: no query string or fragment, invite/referral codes replaced by a placeholder
+ * (so a visit can't be tied back to the person who shared the link), at most 100 characters.
+ */
+export function cleanPath(p: unknown): string | null {
+  if (typeof p !== "string" || !p.startsWith("/")) return null;
+  return p.split(/[?#]/)[0].replace(/^\/(invite|r)\/[^/]+/, "/$1/:code").slice(0, 100);
+}
+
 const BOT = /bot|crawl|spider|slurp|preview|monitor|headless|lighthouse|render\.com/i;
 export const isBot = (ua: string | null | undefined) => !ua || BOT.test(ua);
 

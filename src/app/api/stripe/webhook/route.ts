@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         const item = sub.items.data[0];
         const priceId = item?.price?.id ?? null;
         const deleted = event.type === "customer.subscription.deleted";
-        if (deleted) await track("subscription_canceled", { userId, props: { plan: sub.metadata?.plan ?? null, subscription: sub.id } });
+        if (deleted) await track("subscription_canceled", { userId });
         const entitled = !deleted && isEntitled(sub.status);
         const plan = planForPrice(await getPriceMap(), priceId);
         if (entitled && !plan) {
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
 
       case "charge.refunded": {
         const ch = event.data.object as Stripe.Charge;
-        await track("refund", { props: { amount_usd: (ch.amount_refunded ?? 0) / 100, charge: ch.id } });
+        await track("refund", { props: { amount_usd: (ch.amount_refunded ?? 0) / 100 } });
         const invId = (ch as unknown as { invoice?: string }).invoice;
         if (invId) {
           await db.from("referral_conversions").update({ status: "refunded", commission_cents: 0 }).eq("stripe_invoice_id", invId);
