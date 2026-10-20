@@ -10,6 +10,8 @@ export type CategoryId = (typeof categories)[number]["id"];
 
 export type Tier = "free" | "plus" | "pro";
 
+import type { Look } from "./people";
+
 export type Prank = {
   slug: string;
   characterId: string;
@@ -23,6 +25,8 @@ export type Prank = {
   tier: Tier;
   accent: string;
   opener: string;
+  /** This prank's own person. */
+  look: Look;
 };
 
 export function categoryOf(id: CategoryId) {

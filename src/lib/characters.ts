@@ -2,7 +2,8 @@
 // (and give it a look in CharacterFace.tsx). Everything else reads from here.
 // All characters are ORIGINAL fictional people. No real people, no existing IP,
 // no ethnic or racial stereotypes, no sexual characters.
-import { characterStyles, scenarioAdditions } from "./scenarios";
+import { castings, characterStyles, scenarioAdditions } from "./scenarios";
+import { browserVoiceFor, lookFor, phoneVoiceName, voiceAssigner, type Cast, type Look } from "./people";
 
 export type VoiceConfig = {
   browser: { pitch: number; rate: number; prefer?: "male" | "female" };
@@ -27,6 +28,12 @@ export type Scenario = {
   ending?: string;
   /** Lines used only when no AI provider is configured. */
   fallbackLines?: string[];
+  /** Who speaks in this prank (gender/age/tone, optional own name). Filled for every scenario at load. */
+  cast?: Cast;
+  /** Assigned at load: this prank's unique face, natural phone voice and demo voice. */
+  look?: Look;
+  phoneVoice?: string;
+  browserVoice?: VoiceConfig["browser"];
 };
 
 export type Character = {
@@ -413,6 +420,21 @@ for (const c of characters) {
   }
 }
 
+// Give every prank its own person: cast, unique face, its own natural phone voice and demo voice.
+{
+  const usedLooks = new Set<string>();
+  const nextVoice = voiceAssigner();
+  for (const c of characters) {
+    for (const s of c.scenarios) {
+      const slug = `${c.id}-${s.id}`;
+      s.cast ??= castings[`${c.id}/${s.id}`] ?? { gender: c.voice.browser.prefer === "female" ? "f" : "m", age: "adult", delivery: c.style ?? "" };
+      s.look = lookFor(slug, s.cast, usedLooks);
+      s.phoneVoice = phoneVoiceName(nextVoice(s.cast));
+      s.browserVoice = browserVoiceFor(slug, s.cast);
+    }
+  }
+}
+
 export function getCharacter(id: string) {
   return characters.find((c) => c.id === id);
 }
@@ -431,7 +453,7 @@ export function publicCharacter(c: Character) {
   const { personality: _p, style: _st, fallbackLines: _f, spicyLines: _s2, ...rest } = c;
   return {
     ...rest,
-    scenarios: c.scenarios.map(({ id, title, opener }) => ({ id, title, opener })),
+    scenarios: c.scenarios.map(({ id, title, opener, look, browserVoice }) => ({ id, title, opener, look, browserVoice })),
   };
 }
 export type PublicCharacter = ReturnType<typeof publicCharacter>;

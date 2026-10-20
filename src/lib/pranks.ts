@@ -50,6 +50,16 @@ export const prankMeta: Record<string, Meta> = {
   "earl/chinese-food-order": { title: "Chinese Food Order", blurb: "He'd like 'the usual'. From 1974. He can't remember what it is.", category: "orders", icon: "🥡" },
   "earl/smart-fridge": { title: "Grandpa Is Terrified", blurb: "His new smart fridge talks back. It said he's low on milk. He felt judged.", category: "absurd", icon: "🧊", isNew: true },
   "earl/date-your-grandma": { title: "Can I Date Your Grandma?", blurb: "A very polite gentleman would like your blessing to take Grandma to Thursday bingo.", category: "relationship", icon: "🎲", isNew: true },
+  "brenda/pro-cuddler": { title: "Did You Hire a Professional Cuddler?", blurb: "Marisol is confirming today's Deluxe Burrito Wrap. She has a hug menu and a clipboard.", category: "mixup", icon: "🤗", isNew: true },
+  "tony/wild-grandma": { title: "Can You Babysit My Wild Grandma?", blurb: "Grandma Dot is 84, banned from two trampoline parks, and currently on the roof.", category: "absurd", icon: "🛹", isNew: true },
+  "dez/no-tip": { title: "You Didn't Tip Me", blurb: "One grape. Delivered in the rain. With a little bow. And no tip. Jaylen is hurt.", category: "confront", icon: "🍇", isNew: true },
+  "gary/water-watch": { title: "Stop Using Your Water", blurb: "The Maple Court Water Watch (just Dennis) clocked a 6-minute shower. With singing.", category: "confront", icon: "🚿", isNew: true },
+  "jordan/shoe-fan-club": { title: "Your Shoes Have a Fan Club", blurb: "47 members, a group chat called 'Laces Out', and they need an autograph for the sneakers.", category: "absurd", icon: "👟", isNew: true },
+  "jordan/wifi-thief": { title: "Stop Stealing My WiFi", blurb: "No offense, but Tanya's show buffered at the best part, and she has evidence.", category: "confront", icon: "📶", isNew: true },
+  "sal/new-stepmom": { title: "I'm Your New Stepmom", blurb: "Crystal is marrying 'your dad Gerald' at a bowling alley and you're the flower kid.", category: "relationship", icon: "💍", isNew: true },
+  "sal/penguin-escape": { title: "A Zoo Penguin Escaped", blurb: "Waddles got out of the petting zoo and keeps calling your number with his beak.", category: "absurd", icon: "🐧", isNew: true },
+  "chad/bowling-rival": { title: "Your Mom Keeps Beating Me at Bowling", blurb: "Five weeks in a row. A strike while eating a pretzel. Rick needs her secret.", category: "confront", icon: "🎳", isNew: true },
+  "earl/karaoke-partner": { title: "We Met at Karaoke Night", blurb: "Jess says your friend promised to be her duet partner for Friday's karaoke finals.", category: "mixup", icon: "🎤", isNew: true },
 };
 
 
@@ -68,6 +78,7 @@ const toPrank = (c: Character, s: Scenario): Prank => {
     tier: c.tier,
     accent: c.accent,
     opener: s.opener,
+    look: s.look!,
   };
 };
 

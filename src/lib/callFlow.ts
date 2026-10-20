@@ -218,13 +218,17 @@ export function speakTwiml(r: CallRequest, lineIndex: number, text: string) {
     const key = `${r.id}:${lineIndex}`;
     return `<Play>${xml(`${brand.appUrl}/api/twilio/audio?req=${r.id}&t=${lineIndex}&sig=${sign(key)}`)}</Play>`;
   }
-  return `<Say voice="${xml(character.voice.polly)}">${xml(text.replace(/\*[^*]{1,30}\*/g, ""))}</Say>`;
+  const { scenario } = callContext(r);
+  return `<Say voice="${xml(scenario.phoneVoice ?? character.voice.polly)}">${xml(text.replace(/\*[^*]{1,30}\*/g, ""))}</Say>`;
 }
 
-/** Wait for the recipient to speak; Twilio posts the transcription to /api/twilio/turn. */
-export function listenTwiml(r: CallRequest) {
+/**
+ * Wait for the recipient to speak; Twilio posts the transcription to /api/twilio/turn.
+ * `speech` is played INSIDE the Gather so the person can interrupt (barge in), like a real call.
+ */
+export function listenTwiml(r: CallRequest, speech = "") {
   const action = `${brand.appUrl}/api/twilio/turn?req=${r.id}&sig=${sign(r.id)}`;
-  return `<Gather input="speech" action="${xml(action)}" method="POST" speechTimeout="auto" timeout="6" language="en-US" speechModel="phone_call" actionOnEmptyResult="true"></Gather>`;
+  return `<Gather input="speech" action="${xml(action)}" method="POST" speechTimeout="auto" timeout="6" language="en-US" speechModel="phone_call" actionOnEmptyResult="true">${speech}</Gather>`;
 }
 
 export function disclosureText(senderName: string) {
@@ -234,13 +238,14 @@ export function disclosureText(senderName: string) {
 /** First response when the call connects: disclosure, the scenario opener, then listen. */
 export function answerTwiml(r: CallRequest, transcript: ChatTurn[]) {
   return twiml(
+    // The disclosure is outside the Gather so it can't be skipped by talking over it.
     `<Say voice="Polly.Joanna-Neural">${xml(disclosureText(r.sender_name))}</Say><Pause length="1"/>` +
-      speakTwiml({ ...r, transcript }, 0, transcript[0].text) +
-      listenTwiml(r),
+      listenTwiml(r, speakTwiml({ ...r, transcript }, 0, transcript[0].text)),
   );
 }
 
 export function turnTwiml(r: CallRequest, outcome: TurnOutcome) {
   const line = outcome.transcript.length - 1;
-  return twiml(speakTwiml({ ...r, transcript: outcome.transcript }, line, outcome.reply) + (outcome.hangup ? "<Hangup/>" : listenTwiml(r)));
+  const speech = speakTwiml({ ...r, transcript: outcome.transcript }, line, outcome.reply);
+  return twiml(outcome.hangup ? speech + "<Hangup/>" : listenTwiml(r, speech));
 }

@@ -27,7 +27,7 @@ const NEW = [
 test("every scenario is a prank with card copy, a unique slug and a known category", () => {
   const total = characters.reduce((n, c) => n + c.scenarios.length, 0);
   assert.equal(pranks.length, total);
-  assert.equal(total, 40);
+  assert.equal(total, 50);
   assert.equal(new Set(pranks.map((p) => p.slug)).size, total);
   for (const c of characters) for (const s of c.scenarios) assert.ok(prankMeta[`${c.id}/${s.id}`], `missing card copy for ${c.id}/${s.id}`);
   assert.deepEqual(Object.keys(prankMeta).sort(), pranks.map((p) => `${p.characterId}/${p.scenarioId}`).sort(), "no orphan card copy");
@@ -36,7 +36,7 @@ test("every scenario is a prank with card copy, a unique slug and a known catego
   for (const c of categories) assert.ok(pranks.some((p) => p.category === c.id), `empty category ${c.id}`);
 });
 
-test("the 11 new scenarios exist once each, are complete, and the two sexual ideas were reframed", () => {
+test("set 2: the 11 scenarios exist once each, are complete, and the two sexual ideas were reframed", () => {
   for (const [cid, sid, title] of NEW) {
     const c = getCharacter(cid)!;
     const s = findScenario(c, sid);
@@ -76,10 +76,10 @@ test("tiers come from the voice: Chad and Earl pranks stay Pro-only", () => {
 });
 
 test("prank objects are public-safe and the client module never imports prompts", () => {
-  const allowed = ["slug", "characterId", "scenarioId", "title", "blurb", "category", "icon", "isNew", "pick", "tier", "accent", "opener"].sort();
+  const allowed = ["slug", "characterId", "scenarioId", "title", "blurb", "category", "icon", "isNew", "pick", "tier", "accent", "opener", "look"].sort();
   for (const p of pranks) assert.deepEqual(Object.keys(p).sort(), allowed);
   const json = JSON.stringify(pranks);
-  assert.doesNotMatch(json, /persona|personality|fallbackLines|beats/);
+  assert.doesNotMatch(json, /"(persona|personality|fallbackLines|beats|setup|delivery|cast)"/);
   for (const f of ["src/lib/prankCategories.ts", "src/components/PrankCard.tsx", "src/components/PrankLibrary.tsx", "src/components/PrankArt.tsx", "src/app/call/CallStudio.tsx"]) {
     const src = readFileSync(f, "utf8");
     assert.doesNotMatch(src, /from "@\/lib\/(characters|pranks|scenarios)"/, `${f} would bundle prompts into the browser`);
@@ -107,4 +107,59 @@ test("every new scenario builds a phone prompt and runs a scripted call turn", a
     assert.ok(out.reply.length > 0, `${sid} replied`);
     assert.equal(out.hangup, false);
   }
+});
+
+const SET3 = [
+  ["brenda", "pro-cuddler"], ["tony", "wild-grandma"], ["dez", "no-tip"], ["gary", "water-watch"], ["jordan", "shoe-fan-club"],
+  ["jordan", "wifi-thief"], ["sal", "new-stepmom"], ["sal", "penguin-escape"], ["chad", "bowling-rival"], ["earl", "karaoke-partner"],
+] as const;
+
+test("set 3: 10 new pranks, each its own named person; duplicates and unsafe ideas weren't added as-is", () => {
+  for (const [cid, sid] of SET3) {
+    const s = findScenario(getCharacter(cid)!, sid)!;
+    assert.ok(s, `${cid}/${sid}`);
+    assert.ok(s.cast?.name && s.cast.style && s.cast.delivery, `${sid} has its own person`);
+    assert.ok(s.persona && s.ending && (s.beats?.length ?? 0) >= 3 && (s.fallbackLines?.length ?? 0) >= 4, `${sid} complete`);
+  }
+  const titles = pranks.map((p) => p.title.toLowerCase());
+  for (const bad of [/fetish/, /affair/, /homeless/, /tiger/]) assert.ok(!titles.some((t) => bad.test(t)), String(bad));
+  assert.equal(titles.filter((t) => /secret crush/.test(t)).length, 1);
+  assert.equal(titles.filter((t) => /grandpa is terrified/.test(t)).length, 1);
+  const penguin = findScenario(getCharacter("sal")!, "penguin-escape")!;
+  assert.match(penguin.persona!, /NO danger/);
+  const all = characters.flatMap((c) => c.scenarios.flatMap((s) => [s.opener, ...(s.fallbackLines ?? [])]));
+  for (const line of all) assert.doesNotMatch(line, /\b(sexy|fetish|affair|evacuate|lock your doors|call 911)\b/i, line);
+});
+
+test("every prank has a unique face and its own natural voice that matches the speaker", async () => {
+  const { ALL_PHONE_VOICES, PHONE_VOICES } = await import("../src/lib/people");
+  const keys = new Set<string>();
+  const uses = new Map<string, number>();
+  for (const c of characters) for (const s of c.scenarios) {
+    const l = s.look!;
+    const key = `${l.skin}|${l.hair}|${l.hairColor}|${l.accessory}|${l.shirt}`;
+    assert.ok(!keys.has(key), `duplicate face for ${c.id}/${s.id}`);
+    keys.add(key);
+    const name = s.phoneVoice!.replace("Google.en-US-Chirp3-HD-", "");
+    assert.ok(ALL_PHONE_VOICES.has(name), `${s.phoneVoice} is a known voice`);
+    assert.ok((PHONE_VOICES[s.cast!.gender] as Record<string, readonly string[]>)[s.cast!.age].includes(name), `${c.id}/${s.id} voice matches gender/age`);
+    uses.set(name, (uses.get(name) ?? 0) + 1);
+    assert.ok(s.browserVoice && s.browserVoice.prefer === (s.cast!.gender === "f" ? "female" : "male"));
+  }
+  assert.ok(Math.max(...uses.values()) <= 3, "no voice used more than 3 times");
+  // Neighbouring pranks of the same voice character never share a voice.
+  for (const c of characters) for (let i = 1; i < c.scenarios.length; i++) {
+    if (c.scenarios[i].cast!.gender === c.scenarios[i - 1].cast!.gender && c.scenarios[i].cast!.age === c.scenarios[i - 1].cast!.age)
+      assert.notEqual(c.scenarios[i].phoneVoice, c.scenarios[i - 1].phoneVoice, `${c.id} ${i}`);
+  }
+});
+
+test("prompt plays the prank's own person, tone and short phone replies", () => {
+  const c = getCharacter("sal")!;
+  const s = findScenario(c, "penguin-escape")!;
+  const prompt = buildSystemPrompt({ character: c, scenario: s, channel: "phone", senderName: "Anthony", history: [] } as never);
+  assert.match(prompt, /^You are Hank\./);
+  assert.doesNotMatch(prompt, /You are Sal/);
+  assert.match(prompt, /How you sound and feel in this call: slow, warm, creaky/);
+  assert.match(prompt, /5 to 20 words/);
 });

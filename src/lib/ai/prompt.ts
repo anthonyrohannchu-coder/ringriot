@@ -10,9 +10,11 @@ export function buildSystemPrompt({ character, scenario, userName, spicy, channe
 
   // A scenario persona replaces the character's default backstory, so e.g. Brenda in a
   // "Why are you calling my boyfriend?" bit isn't also a fast-food customer.
+  const cast = scenario.cast;
   const identity = scenario.persona
-    ? [`You are ${character.name}. ${character.style ?? ""}`.trim(), `Who you are in this call: ${scenario.persona}`]
+    ? [`You are ${cast?.name ?? character.name}. ${cast?.style ?? character.style ?? ""}`.trim(), `Who you are in this call: ${scenario.persona}`]
     : [character.personality];
+  if (cast?.delivery) identity.push(`How you sound and feel in this call: ${cast.delivery}. Let that mood show in your word choice and punctuation (short bursts, exclamations, trailing off...), never by describing it.`);
 
   return [
     ...identity,
@@ -23,7 +25,8 @@ export function buildSystemPrompt({ character, scenario, userName, spicy, channe
     scenario.ending ? `How to land it when the call wraps up: ${scenario.ending}` : "",
     userName ? `The other person's first name is ${userName}.` : "",
     "Style rules:",
-    "- Talk like a real person on a phone call, not a writer: 1 to 3 short sentences, contractions, filler words (uh, like, wait, okay okay), interrupt yourself, trail off, react out loud (pfft, ugh, hah). Never sound polished or like an assistant.",
+    "- Sound like a real human on a real phone call, not a writer or an assistant: contractions, casual grammar, the odd filler (uh, wait, okay okay, like), interrupt yourself, trail off, react out loud (pfft, ugh, hah, oh my god). Vary it; never use the same filler twice in a row.",
+    "- Have a real back-and-forth: actually listen, answer what they asked, remember what they said earlier, and sometimes just react (\"wait, what?\") instead of always pushing the bit.",
     "- This is read aloud: no lists, no emoji, no stage directions longer than three words.",
     "- React to the exact words they just said first, then push the bit further. Callbacks to earlier lines are gold. Be funny, not random.",
     "- Never explain the joke, never be wholesome-preachy, never ask 'how can I help'.",
@@ -54,7 +57,7 @@ function phoneRules(senderName: string | undefined, repliesLeft: number | undefi
     "Live phone call rules:",
     "- This is a real, live phone call. Their words reach you through speech-to-text and may be garbled or cut off; if a line makes no sense, react in character (\"sorry, you cut out, say that again?\") instead of guessing.",
     "- Every reply starts by responding to their latest words: answer their question, react to the surprise, roll with whatever they said. Only then nudge the bit along. Never skip past what they said to deliver a prepared line.",
-    "- Keep every reply to one or two short spoken sentences (under 35 words) and usually end with a question or an opening, so they talk back.",
+    "- Keep every reply short like real phone talk: usually 5 to 20 words, never more than two short sentences, and usually end with a question or an opening so they talk back. They can interrupt you, so put the important part first.",
     "- \"(they said nothing)\" means silence: prod them in character (\"hello? you still there?\").",
     senderName
       ? `- Their friend ${senderName} sent this call (they were told at the start). Keep the bit going; only bring up ${senderName} when you wrap up.`

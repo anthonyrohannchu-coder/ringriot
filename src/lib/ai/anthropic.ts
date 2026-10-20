@@ -29,7 +29,8 @@ export class AnthropicProvider implements ConversationProvider {
     const res = await this.client.messages.create(
       {
         model: this.model,
-        max_tokens: 160,
+        // Phone replies must stay short (5-20 words); the browser demo can run a little longer.
+        max_tokens: input.channel === "phone" ? 90 : 160,
         temperature: 1,
         system: buildSystemPrompt(input),
         messages,

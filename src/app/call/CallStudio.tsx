@@ -6,9 +6,9 @@ import type { Prank } from "@/lib/prankCategories";
 import { canUse, categories } from "@/lib/prankCategories";
 import { PrankArt } from "@/components/PrankArt";
 import { TierBadge } from "@/components/PrankCard";
-import { CharacterFace } from "@/components/CharacterFace";
+import { PersonFace } from "@/components/PersonFace";
 
-type Call = { id: string; character_id: string; status: string; turns: number; created_at: string; to: string | null; hasRecording: boolean };
+type Call = { id: string; character_id: string; scenario_id?: string | null; status: string; turns: number; created_at: string; to: string | null; hasRecording: boolean };
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   awaiting_consent: { label: "Waiting for their YES", tone: "bg-volt" },
@@ -91,7 +91,7 @@ export function CallStudio({ pranks, initialSlug, plan, credits, cost: CALL_COST
     }
   }
 
-  const titleFor = (c: Call) => pranks.find((p) => p.characterId === c.character_id);
+  const titleFor = (c: Call) => pranks.find((p) => p.characterId === c.character_id && p.scenarioId === c.scenario_id) ?? pranks.find((p) => p.characterId === c.character_id);
   const disabledReason =
     locked ? `This prank is on ${prank.tier === "pro" ? "Pro" : "Plus"}`
     : credits < CALL_COST ? `You need ${CALL_COST} credits`
@@ -206,9 +206,9 @@ export function CallStudio({ pranks, initialSlug, plan, credits, cost: CALL_COST
           return (
             <div key={c.id} className="sticker-sm rounded-2xl bg-panel p-3">
               <div className="flex items-center gap-3">
-                {p && <CharacterFace id={p.characterId} color={p.accent} size={40} />}
+                {p && <PersonFace look={p.look} size={40} />}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-extrabold">To {c.to ?? "friend"}</div>
+                  <div className="truncate font-extrabold">{p?.title ?? "Prank call"} → {c.to ?? "friend"}</div>
                   <div className="text-xs font-semibold text-ink/60">{new Date(c.created_at).toLocaleString()}</div>
                 </div>
                 <span className={`sticker-sm shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${st.tone}`}>{st.label}</span>

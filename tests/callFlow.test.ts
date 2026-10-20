@@ -38,7 +38,7 @@ async function bodyOf(res: Response) {
   return await res.text();
 }
 
-test("answering: disclosure first, then the selected scenario's opener, then it listens", async () => {
+test("answering: disclosure first (not skippable), then the opener spoken inside the listening Gather so they can interrupt", async () => {
   const r = base();
   const transcript = openingTranscript(r);
   assert.equal(transcript[0].text, getCharacter("sal")!.scenarios.find((s) => s.id === "hit-my-car")!.opener);
@@ -46,10 +46,14 @@ test("answering: disclosure first, then the selected scenario's opener, then it 
   const iDisclosure = xml.indexOf("A.I. comedy call");
   const iOpener = xml.indexOf("You hit my car!");
   const iGather = xml.indexOf("<Gather");
-  assert.ok(iDisclosure >= 0 && iDisclosure < iOpener && iOpener < iGather, "disclosure -> opener -> listen");
+  assert.ok(iDisclosure >= 0 && iDisclosure < iGather && iGather < iOpener, "disclosure, then a Gather that contains the opener");
+  assert.ok(xml.indexOf("</Gather>") > iOpener, "opener is nested in the Gather (barge-in)");
+  assert.ok(iDisclosure < xml.indexOf("<Gather"), "disclosure is outside the Gather, so talking can't skip it");
   assert.ok(xml.includes("sent by Anthony") && xml.includes("being recorded"));
   assert.match(xml, /<Gather input="speech" action="https:\/\/ringriot\.example\/api\/twilio\/turn\?req=11111111-1111-1111-1111-111111111111&amp;sig=[^"]+"/);
-  assert.ok(xml.includes('voice="Polly.Matthew-Neural"'), "Sal's phone voice");
+  const scenario = getCharacter("sal")!.scenarios.find((s) => s.id === "hit-my-car")!;
+  assert.match(scenario.phoneVoice!, /^Google\.en-US-Chirp3-HD-[A-Z][a-z]+$/);
+  assert.ok(xml.includes(`voice="${scenario.phoneVoice}"`), "this prank's own natural voice");
 });
 
 test("the selected scenario reaches the model on every turn, with the recipient's words and growing context", async () => {
@@ -79,6 +83,7 @@ test("the selected scenario reaches the model on every turn, with the recipient'
   assert.equal(m.inputs[1].repliesLeft, 7);
   const xml = await bodyOf(turnTwiml(r, out));
   assert.ok(xml.includes("checking.") && xml.includes("<Gather"), "speaks the reply, then listens again");
+  assert.ok(xml.indexOf("<Gather") < xml.indexOf("checking."), "the reply is interruptible (inside the Gather)");
 });
 
 test("system prompt for every requested scenario uses its persona, not the character's default backstory", () => {
