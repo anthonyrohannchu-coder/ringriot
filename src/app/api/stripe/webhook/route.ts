@@ -163,7 +163,9 @@ export async function POST(req: NextRequest) {
 
       case "charge.refunded": {
         const ch = event.data.object as Stripe.Charge;
-        await track("refund", { props: { amount_usd: (ch.amount_refunded ?? 0) / 100 } });
+        // Record only this refund's amount (amount_refunded is cumulative across partial refunds).
+        const latest = (ch as unknown as { refunds?: { data?: { amount?: number }[] } }).refunds?.data?.[0]?.amount;
+        await track("refund", { props: { amount_usd: (latest ?? ch.amount_refunded ?? 0) / 100 } });
         const invId = (ch as unknown as { invoice?: string }).invoice;
         if (invId) {
           await db.from("referral_conversions").update({ status: "refunded", commission_cents: 0 }).eq("stripe_invoice_id", invId);
