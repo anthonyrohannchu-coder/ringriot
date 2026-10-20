@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { PublicCharacter } from "@/lib/characters";
 import { PersonFace } from "./PersonFace";
 import { Waveform } from "./Waveform";
+import { playPreview, stopPreview } from "@/lib/previewAudio";
 
 type Turn = { role: "user" | "character"; text: string };
 type Mode = "demo" | "paid";
@@ -35,13 +36,11 @@ export function DemoChat({
   mode,
   initialCharacterId,
   initialScenarioId,
-  premiumVoice = false,
 }: {
   characters: PublicCharacter[];
   mode: Mode;
   initialCharacterId?: string;
   initialScenarioId?: string;
-  premiumVoice?: boolean;
 }) {
   const [charId, setCharId] = useState(initialCharacterId ?? characters[0].id);
   const character = useMemo(() => characters.find((c) => c.id === charId)!, [characters, charId]);
@@ -86,7 +85,7 @@ export function DemoChat({
   }, [started]);
 
   function reset(nextChar = charId) {
-    window.speechSynthesis?.cancel();
+    stopPreview();
     const c = characters.find((x) => x.id === nextChar)!;
     setCharId(nextChar);
     setScenarioId(c.scenarios[0].id);
@@ -103,19 +102,7 @@ export function DemoChat({
     if (muted) return;
     setSpeaking(true);
     try {
-      if (premiumVoice && mode === "paid") {
-        const r = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ characterId: character.id, text }),
-        });
-        if (r.ok) {
-          const audio = new Audio(URL.createObjectURL(await r.blob()));
-          audio.onended = () => setSpeaking(false);
-          await audio.play();
-          return;
-        }
-      }
+      stopPreview();
       if (!("speechSynthesis" in window)) return setSpeaking(false);
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text.replace(/\*[^*]{1,30}\*/g, ""));
@@ -138,7 +125,14 @@ export function DemoChat({
     const opener =
       declines > 0 ? `Oh, NOW you pick up. ${scenario.opener}` : scenario.opener;
     setTurns([{ role: "character", text: opener }]);
-    speak(opener);
+    if (declines === 0 && !muted) {
+      // The recorded, human-voiced opener for this prank (falls back to the device voice).
+      setSpeaking(true);
+      playPreview(`${character.id}-${scenario.id}`, scenario.opener, {
+        browserVoice: scenario.browserVoice ?? character.voice.browser,
+        onEnd: () => setSpeaking(false),
+      });
+    } else speak(opener);
   }
 
   function decline() {
@@ -192,7 +186,7 @@ export function DemoChat({
     const W = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR };
     const Ctor = W.SpeechRecognition ?? W.webkitSpeechRecognition;
     if (!Ctor) return setError({ message: "Voice input doesn't work in this browser. Type instead." });
-    window.speechSynthesis?.cancel();
+    stopPreview();
     const rec = new Ctor();
     rec.lang = "en-US";
     rec.interimResults = false;
@@ -341,7 +335,7 @@ export function DemoChat({
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => { setMuted((m) => !m); window.speechSynthesis?.cancel(); }} className="sticker-sm rounded-full bg-panel px-3 py-1 text-xs font-bold" aria-label={muted ? "Unmute" : "Mute"}>
+                  <button onClick={() => { setMuted((m) => !m); stopPreview(); }} className="sticker-sm rounded-full bg-panel px-3 py-1 text-xs font-bold" aria-label={muted ? "Unmute" : "Mute"}>
                     {muted ? "🔇" : "🔊"}
                   </button>
                 </div>

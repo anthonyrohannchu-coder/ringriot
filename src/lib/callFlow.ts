@@ -5,7 +5,7 @@ import { getCharacter, getScenario, type Character, type Scenario } from "@/lib/
 import { END_TOKEN } from "@/lib/ai/prompt";
 import { describeAIError, type AIErrorInfo } from "@/lib/ai/errors";
 import type { ChatTurn, GenerateInput, GenerateResult } from "@/lib/ai/types";
-import { elevenlabsAvailable } from "@/lib/tts";
+import { elevenlabsForCalls } from "@/lib/tts";
 import { MAX_CALL_TURNS, sign, twiml, xml } from "@/lib/twilio";
 
 export type CallRequest = {
@@ -211,10 +211,10 @@ export async function nextTurn(r: CallRequest, heard: string, generate: Generate
 
 // ---------- TwiML ----------
 
-/** Speak a line in the character's voice: ElevenLabs audio if available, otherwise a Polly voice. */
+/** Speak a line in this prank's voice: ElevenLabs audio when enabled for calls, otherwise its natural Twilio voice. */
 export function speakTwiml(r: CallRequest, lineIndex: number, text: string) {
   const { character } = callContext(r);
-  if (elevenlabsAvailable()) {
+  if (elevenlabsForCalls()) {
     const key = `${r.id}:${lineIndex}`;
     return `<Play>${xml(`${brand.appUrl}/api/twilio/audio?req=${r.id}&t=${lineIndex}&sig=${sign(key)}`)}</Play>`;
   }

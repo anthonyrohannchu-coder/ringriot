@@ -88,20 +88,7 @@ export const CALL_CREDIT_COST = 3;
 export const USER_REQUESTS_PER_DAY = 10;
 export const RECIPIENT_REQUESTS_PER_DAY = 3;
 
-const TOLL_FREE = new Set(["800", "833", "844", "855", "866", "877", "888"]);
-
-/** US/Canada mobile-style numbers only. Blocks N11 (911 etc.), toll-free and malformed numbers. */
-export function normalizeNumber(input: string): string | null {
-  let d = input.replace(/\D/g, "");
-  if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
-  if (d.length !== 10) return null;
-  const area = d.slice(0, 3), exch = d.slice(3, 6);
-  if (!/[2-9]/.test(area[0]) || !/[2-9]/.test(exch[0])) return null;
-  if (area[1] === "1" && area[2] === "1") return null; // N11
-  if (exch[1] === "1" && exch[2] === "1") return null;
-  if (TOLL_FREE.has(area) || area === "900") return null;
-  return `+1${d}`;
-}
+export { normalizeNumber } from "@/lib/phone";
 
 export function hashNumber(e164: string) {
   return crypto.createHmac("sha256", process.env.DEMO_COOKIE_SECRET || "pepper").update(e164).digest("hex");

@@ -19,7 +19,7 @@ export const plans = {
     features: [
       `${FREE_DEMO_REPLIES_PER_DAY} AI replies a day in the browser demo`,
       "3 starter characters",
-      "Browser voices",
+      "Hear every prank's opener",
     ],
     stripePriceEnv: null,
   },
@@ -41,13 +41,12 @@ export const plans = {
     id: "pro" as const,
     name: "Pro",
     priceLabel: "$19.99",
-    // 60, not 100: with premium voices on every reply, 100 left only ~16% worst-case margin (see README).
+    // 60 credits keeps a healthy margin on real call minutes (see README).
     monthlyCredits: 60,
     features: [
       "60 credits every month",
       "📞 Real calls with every character",
       "Pro-only characters and scenarios",
-      "Premium AI voices",
       "Remove clip watermark",
     ],
     stripePriceEnv: "STRIPE_PRICE_PRO",

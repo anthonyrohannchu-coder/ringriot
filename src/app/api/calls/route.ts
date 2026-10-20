@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "bad_request", message: parsed.error.issues[0]?.message ?? "Check the form." }, { status: 400 });
   const { senderName, characterId, scenarioId } = parsed.data;
-  const callerNumber = parsed.data.callerNumber || configuredCallerNumbers()[0];
+  // Prank Caller Number: must be one of RingRiot's own provisioned numbers. Never trust the client's choice.
+  const numbers = configuredCallerNumbers();
+  const callerNumber = parsed.data.callerNumber || (numbers.length === 1 ? numbers[0] : "");
   if (!callerNumber || !isAllowedCallerNumber(callerNumber)) {
     return NextResponse.json({ error: "bad_caller_number", message: "Choose one of the configured caller numbers." }, { status: 400 });
   }
@@ -114,5 +116,6 @@ export async function GET() {
     hasRecording: !!c.recording_sid,
     recording_sid: undefined,
   }));
-  return NextResponse.json({ calls, callerNumbers: configuredCallerNumbers() });
+  const { data: bal } = await supabaseAdmin().from("credit_balances").select("balance").eq("user_id", user.id).single();
+  return NextResponse.json({ calls, callerNumbers: configuredCallerNumbers(), credits: bal?.balance ?? null, cost: CALL_CREDIT_COST });
 }
